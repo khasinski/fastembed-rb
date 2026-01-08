@@ -108,6 +108,31 @@ end
 | intfloat/multilingual-e5-small | 384 | 100+ languages support |
 | intfloat/multilingual-e5-base | 768 | Larger multilingual model |
 
+## Benchmarks
+
+Performance benchmarks on Apple M1 Max, Ruby 3.3.10, using the default model (BAAI/bge-small-en-v1.5):
+
+### Single Document Latency
+
+| Text Length | Latency |
+|-------------|---------|
+| Short (~10 tokens) | ~6.5 ms |
+| Medium (~30 tokens) | ~6.5 ms |
+
+### Batch Throughput (100 documents)
+
+| Text Length | Time | Throughput |
+|-------------|------|------------|
+| Short sentences | 0.2s | **502 docs/sec** |
+| Medium paragraphs | 0.5s | **197 docs/sec** |
+| Long documents | 2.3s | **44 docs/sec** |
+
+### Large Scale
+
+| Documents | Time | Throughput |
+|-----------|------|------------|
+| 1,000 short texts | 2.1s | **484 docs/sec** |
+
 ## Configuration
 
 ### Custom Cache Directory
