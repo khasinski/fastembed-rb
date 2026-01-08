@@ -24,7 +24,7 @@ module Fastembed
           seq_len.times do |seq_idx|
             weight = mask[seq_idx].to_f
             mask_sum += weight
-            next if weight == 0
+            next if weight.zero?
 
             hidden_size.times do |hidden_idx|
               summed[hidden_idx] += embeddings[seq_idx][hidden_idx] * weight
@@ -32,7 +32,7 @@ module Fastembed
           end
 
           # Avoid division by zero
-          mask_sum = 1.0 if mask_sum == 0
+          mask_sum = 1.0 if mask_sum.zero?
 
           # Divide by sum of mask to get mean
           summed.map { |v| v / mask_sum }
@@ -48,7 +48,7 @@ module Fastembed
       def normalize(vectors)
         vectors.map do |vector|
           norm = Math.sqrt(vector.sum { |v| v * v })
-          norm = 1.0 if norm == 0
+          norm = 1.0 if norm.zero?
           vector.map { |v| v / norm }
         end
       end

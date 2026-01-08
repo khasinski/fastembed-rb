@@ -54,12 +54,21 @@ module Fastembed
     # @param documents [Array<String>, String] Text document(s) to embed
     # @param batch_size [Integer] Number of documents to process at once
     # @return [Enumerator] Lazy enumerator yielding embedding vectors
+    # @raise [ArgumentError] If documents is nil or contains nil values
     #
     # @example
     #   vectors = embedding.embed(["Hello", "World"]).to_a
     #   # => [[0.1, 0.2, ...], [0.3, 0.4, ...]]
     def embed(documents, batch_size: 256)
+      raise ArgumentError, 'documents cannot be nil' if documents.nil?
+
       documents = [documents] if documents.is_a?(String)
+      return Enumerator.new { |_| } if documents.empty?
+
+      # Validate all documents
+      documents.each_with_index do |doc, i|
+        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
+      end
 
       Enumerator.new do |yielder|
         documents.each_slice(batch_size) do |batch|

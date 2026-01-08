@@ -101,12 +101,22 @@ end
 
 | Model | Dimensions | Description |
 |-------|-----------|-------------|
+| **BGE Models** | | |
 | BAAI/bge-small-en-v1.5 | 384 | Fast and accurate English (default) |
 | BAAI/bge-base-en-v1.5 | 768 | Balanced accuracy and speed |
 | BAAI/bge-large-en-v1.5 | 1024 | Highest accuracy English |
+| **Sentence Transformers** | | |
 | sentence-transformers/all-MiniLM-L6-v2 | 384 | Lightweight general-purpose |
+| sentence-transformers/paraphrase-MiniLM-L6-v2 | 384 | Paraphrase and similarity |
+| sentence-transformers/all-mpnet-base-v2 | 768 | High quality embeddings |
+| **Multilingual** | | |
 | intfloat/multilingual-e5-small | 384 | 100+ languages support |
 | intfloat/multilingual-e5-base | 768 | Larger multilingual model |
+| **Long Context (8192 tokens)** | | |
+| nomic-ai/nomic-embed-text-v1 | 768 | Long context English |
+| nomic-ai/nomic-embed-text-v1.5 | 768 | Matryoshka support |
+| jinaai/jina-embeddings-v2-small-en | 512 | Small, long context |
+| jinaai/jina-embeddings-v2-base-en | 768 | Base, long context |
 
 ## Benchmarks
 

@@ -1,0 +1,73 @@
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.0
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'bin/*'
+    - 'vendor/**/*'
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/AbcSize:
+  Max: 30
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/ParameterLists:
+  Max: 9
+
+Naming/MethodParameterName:
+  AllowedNames:
+    - a
+    - b
+    - x
+    - y
+
+Lint/EmptyBlock:
+  Exclude:
+    - 'lib/fastembed/text_embedding.rb'
+
+RSpec/MultipleDescribes:
+  Enabled: false
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - '*.gemspec'
+
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/ModuleLength:
+  Max: 150
+
+Layout/LineLength:
+  Max: 120
+
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/ExampleLength:
+  Max: 15
+
+RSpec/NestedGroups:
+  Max: 4
+
+RSpec/DescribeClass:
+  Exclude:
+    - 'spec/integration_spec.rb'

@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-require "net/http"
-require "uri"
-require "json"
-require "fileutils"
+require 'net/http'
+require 'uri'
+require 'json'
+require 'fileutils'
 
 module Fastembed
   # Handles model downloading and caching
   module ModelManagement
-    HF_API_BASE = "https://huggingface.co"
+    HF_API_BASE = 'https://huggingface.co'
     REQUIRED_FILES = %w[
       config.json
       tokenizer.json
@@ -21,17 +21,15 @@ module Fastembed
       # Priority: FASTEMBED_CACHE_PATH > XDG_CACHE_HOME > ~/.cache
       def cache_dir
         @cache_dir ||= begin
-          base = ENV["FASTEMBED_CACHE_PATH"] ||
-                 ENV["XDG_CACHE_HOME"] ||
-                 File.join(Dir.home, ".cache")
-          File.join(base, "fastembed")
+          base = ENV['FASTEMBED_CACHE_PATH'] ||
+                 ENV['XDG_CACHE_HOME'] ||
+                 File.join(Dir.home, '.cache')
+          File.join(base, 'fastembed')
         end
       end
 
       # Set a custom cache directory
-      def cache_dir=(path)
-        @cache_dir = path
-      end
+      attr_writer :cache_dir
 
       # Returns the path to a cached model, downloading if necessary
       def retrieve_model(model_name, show_progress: true)
@@ -39,9 +37,7 @@ module Fastembed
         model_dir = model_directory(model_info)
 
         # Check if model is already cached
-        if model_cached?(model_dir, model_info)
-          return model_dir
-        end
+        return model_dir if model_cached?(model_dir, model_info)
 
         # Download model
         download_model(model_info, model_dir, show_progress: show_progress)
@@ -62,14 +58,17 @@ module Fastembed
       # Get the directory path for a model
       def model_directory(model_info)
         # Create a safe directory name from the model name
-        safe_name = model_info.model_name.gsub("/", "--")
-        File.join(cache_dir, "models", safe_name)
+        safe_name = model_info.model_name.gsub('/', '--')
+        File.join(cache_dir, 'models', safe_name)
       end
 
       # Resolve model name to ModelInfo
       def resolve_model_info(model_name)
         model_info = SUPPORTED_MODELS[model_name]
-        raise ArgumentError, "Unknown model: #{model_name}. Use TextEmbedding.list_supported_models to see available models." unless model_info
+        unless model_info
+          raise ArgumentError,
+                "Unknown model: #{model_name}. Use TextEmbedding.list_supported_models to see available models."
+        end
 
         model_info
       end
@@ -88,7 +87,8 @@ module Fastembed
         # Download tokenizer and config files
         files_to_download = REQUIRED_FILES + [model_info.tokenizer_file]
         files_to_download.uniq.each do |file|
-          download_file(repo_id, file, model_dir, show_progress: show_progress, required: file == model_info.tokenizer_file)
+          download_file(repo_id, file, model_dir, show_progress: show_progress,
+                                                  required: file == model_info.tokenizer_file)
         end
 
         puts "Model downloaded successfully to #{model_dir}" if show_progress
@@ -112,16 +112,14 @@ module Fastembed
         begin
           download_with_redirect(url, local_path, show_progress: show_progress)
         rescue StandardError => e
-          if required
-            raise DownloadError, "Failed to download #{file_path}: #{e.message}"
-          else
-            puts "  #{file_path} (skipped - not available)" if show_progress
-          end
+          raise DownloadError, "Failed to download #{file_path}: #{e.message}" if required
+
+          puts "  #{file_path} (skipped - not available)" if show_progress
         end
       end
 
       def download_with_redirect(url, local_path, show_progress: true, max_redirects: 10)
-        raise DownloadError, "Too many redirects" if max_redirects <= 0
+        raise DownloadError, 'Too many redirects' if max_redirects <= 0
 
         uri = URI.parse(url)
 
@@ -131,23 +129,20 @@ module Fastembed
           raise DownloadError, "Invalid URL scheme: #{url}"
         end
 
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", read_timeout: 300, open_timeout: 30) do |http|
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', read_timeout: 300,
+                                            open_timeout: 30) do |http|
           request = Net::HTTP::Get.new(uri)
-          request["User-Agent"] = "fastembed-ruby/#{VERSION}"
+          request['User-Agent'] = "fastembed-ruby/#{VERSION}"
 
           response = http.request(request)
 
           case response
           when Net::HTTPSuccess
-            File.open(local_path, "wb") do |file|
-              file.write(response.body)
-            end
+            File.binwrite(local_path, response.body)
           when Net::HTTPRedirection
-            new_url = response["location"]
+            new_url = response['location']
             # Handle relative redirects
-            if new_url.start_with?("/")
-              new_url = "#{uri.scheme}://#{uri.host}#{new_url}"
-            end
+            new_url = "#{uri.scheme}://#{uri.host}#{new_url}" if new_url.start_with?('/')
             download_with_redirect(new_url, local_path, show_progress: show_progress, max_redirects: max_redirects - 1)
           else
             raise DownloadError, "HTTP #{response.code}: #{response.message}"

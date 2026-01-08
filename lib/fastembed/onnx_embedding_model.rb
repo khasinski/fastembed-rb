@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "onnxruntime"
-require "tokenizers"
+require 'onnxruntime'
+require 'tokenizers'
 
 module Fastembed
   # ONNX-based embedding model wrapper
@@ -56,7 +56,7 @@ module Fastembed
       @tokenizer = Tokenizers.from_file(tokenizer_path)
 
       # Configure tokenizer for batch encoding
-      @tokenizer.enable_padding(pad_id: 0, pad_token: "[PAD]")
+      @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
       @tokenizer.enable_truncation(512)
     end
 
@@ -77,14 +77,12 @@ module Fastembed
     def run_inference(encoded)
       # Prepare inputs
       inputs = {
-        "input_ids" => encoded[:input_ids],
-        "attention_mask" => encoded[:attention_mask]
+        'input_ids' => encoded[:input_ids],
+        'attention_mask' => encoded[:attention_mask]
       }
 
       # Some models require token_type_ids
-      if input_names.include?("token_type_ids")
-        inputs["token_type_ids"] = encoded[:token_type_ids]
-      end
+      inputs['token_type_ids'] = encoded[:token_type_ids] if input_names.include?('token_type_ids')
 
       # Run model
       outputs = @session.run(nil, inputs)
