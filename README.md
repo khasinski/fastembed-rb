@@ -1,220 +1,163 @@
 # FastEmbed Ruby
 
-A Ruby port of [FastEmbed](https://github.com/qdrant/fastembed) - a lightweight, fast library for generating text embeddings using ONNX Runtime.
+[![Gem Version](https://badge.fury.io/rb/fastembed.svg)](https://rubygems.org/gems/fastembed)
+[![CI](https://github.com/khasinski/fastembed-rb/actions/workflows/ci.yml/badge.svg)](https://github.com/khasinski/fastembed-rb/actions/workflows/ci.yml)
 
-## Features
+Fast, lightweight text embeddings in Ruby. Convert text into vectors for semantic search, similarity matching, clustering, and RAG applications.
 
-- Fast text embeddings using ONNX Runtime
-- Automatic model downloading and caching from HuggingFace
-- Memory-efficient lazy evaluation with Enumerator
-- Multiple pre-trained models supported
-- No PyTorch dependency - lightweight and serverless-friendly
+```ruby
+embedding = Fastembed::TextEmbedding.new
+vectors = embedding.embed(["Hello world", "Ruby is great"]).to_a
+# => [[0.123, -0.456, ...], [0.789, 0.012, ...]]  (384-dimensional vectors)
+```
+
+## What are embeddings?
+
+Embeddings convert text into numerical vectors that capture semantic meaning. Similar texts produce similar vectors, enabling:
+
+- **Semantic search** - Find relevant documents by meaning, not just keywords
+- **Similarity matching** - Compare texts to find duplicates or related content
+- **RAG applications** - Retrieve context for LLMs like ChatGPT
+- **Clustering** - Group similar documents together
 
 ## Installation
-
-Add this line to your application's Gemfile:
 
 ```ruby
 gem 'fastembed'
 ```
 
-And then execute:
-
-```bash
-bundle install
-```
-
-Or install it yourself as:
-
-```bash
-gem install fastembed
-```
-
-## Usage
-
-### Basic Usage
+## Quick Start
 
 ```ruby
 require 'fastembed'
 
-# Create an embedding model (downloads on first use)
+# Create embedding model (downloads automatically on first use, ~67MB)
 embedding = Fastembed::TextEmbedding.new
 
-# Generate embeddings
+# Embed your texts
+docs = ["Ruby is a programming language", "Python is also a programming language"]
+vectors = embedding.embed(docs).to_a
+
+# Find similarity between texts (cosine similarity via dot product)
+similarity = vectors[0].zip(vectors[1]).sum { |a, b| a * b }
+puts similarity  # => 0.89 (high similarity!)
+```
+
+## Semantic Search Example
+
+```ruby
+# Your document corpus
 documents = [
-  "This is a test document",
-  "Another document to embed"
+  "The quick brown fox jumps over the lazy dog",
+  "Machine learning is a subset of artificial intelligence",
+  "Ruby on Rails is a web application framework",
+  "Neural networks are inspired by biological brains"
 ]
 
-vectors = embedding.embed(documents).to_a
-# => [[0.123, -0.456, ...], [0.789, -0.012, ...]]
+# Create embeddings for all documents
+embedding = Fastembed::TextEmbedding.new
+doc_vectors = embedding.embed(documents).to_a
 
-# Each vector has 384 dimensions (for the default model)
-puts vectors.first.length  # => 384
+# Search query
+query = "AI and deep learning"
+query_vector = embedding.embed(query).first
+
+# Find most similar document (highest dot product)
+similarities = doc_vectors.map.with_index do |doc_vec, i|
+  score = query_vector.zip(doc_vec).sum { |a, b| a * b }
+  [i, score]
+end
+
+best_match = similarities.max_by { |_, score| score }
+puts documents[best_match[0]]  # => "Machine learning is a subset of artificial intelligence"
 ```
 
-### Custom Model
+## Usage
+
+### Choose a Model
 
 ```ruby
-# Use a larger model for higher accuracy
-embedding = Fastembed::TextEmbedding.new(
-  model_name: "BAAI/bge-base-en-v1.5"
-)
+# Default: Fast and accurate (384 dimensions, 67MB)
+embedding = Fastembed::TextEmbedding.new
 
-# Get embedding dimension
-puts embedding.dim  # => 768
+# Higher accuracy (768 dimensions, 210MB)
+embedding = Fastembed::TextEmbedding.new(model_name: "BAAI/bge-base-en-v1.5")
+
+# Multilingual support (100+ languages)
+embedding = Fastembed::TextEmbedding.new(model_name: "intfloat/multilingual-e5-small")
+
+# Long documents (8192 tokens vs default 512)
+embedding = Fastembed::TextEmbedding.new(model_name: "nomic-ai/nomic-embed-text-v1.5")
 ```
 
-### Lazy Evaluation for Large Datasets
+### Process Large Datasets
 
 ```ruby
-# Process embeddings lazily to save memory
-documents = File.readlines("large_corpus.txt")
+# Lazy evaluation - memory efficient for large datasets
+documents = File.readlines("corpus.txt")
 
-embedding.embed(documents).each_slice(100) do |batch|
-  # Process batch of 100 vectors at a time
-  store_in_database(batch)
+embedding.embed(documents, batch_size: 64).each_slice(100) do |batch|
+  store_in_vector_database(batch)
 end
 ```
 
-### Query and Passage Embeddings
-
-For retrieval tasks, use prefixed embeddings:
-
-```ruby
-# Embed queries (optimized for similarity search)
-query_vectors = embedding.query_embed(["What is machine learning?"]).to_a
-
-# Embed passages (optimized for being searched)
-passage_vectors = embedding.passage_embed(["Machine learning is..."]).to_a
-```
-
-### List Supported Models
+### List Available Models
 
 ```ruby
 Fastembed::TextEmbedding.list_supported_models.each do |model|
-  puts "#{model[:model_name]} - #{model[:dim]} dimensions"
+  puts "#{model[:model_name]} - #{model[:dim]}d - #{model[:description]}"
 end
 ```
 
 ## Supported Models
 
-| Model | Dimensions | Description |
-|-------|-----------|-------------|
-| **BGE Models** | | |
-| BAAI/bge-small-en-v1.5 | 384 | Fast and accurate English (default) |
-| BAAI/bge-base-en-v1.5 | 768 | Balanced accuracy and speed |
-| BAAI/bge-large-en-v1.5 | 1024 | Highest accuracy English |
-| **Sentence Transformers** | | |
-| sentence-transformers/all-MiniLM-L6-v2 | 384 | Lightweight general-purpose |
-| sentence-transformers/paraphrase-MiniLM-L6-v2 | 384 | Paraphrase and similarity |
-| sentence-transformers/all-mpnet-base-v2 | 768 | High quality embeddings |
-| **Multilingual** | | |
-| intfloat/multilingual-e5-small | 384 | 100+ languages support |
-| intfloat/multilingual-e5-base | 768 | Larger multilingual model |
-| **Long Context (8192 tokens)** | | |
-| nomic-ai/nomic-embed-text-v1 | 768 | Long context English |
-| nomic-ai/nomic-embed-text-v1.5 | 768 | Matryoshka support |
-| jinaai/jina-embeddings-v2-small-en | 512 | Small, long context |
-| jinaai/jina-embeddings-v2-base-en | 768 | Base, long context |
+| Model | Dim | Use Case |
+|-------|-----|----------|
+| `BAAI/bge-small-en-v1.5` | 384 | Default, fast English embeddings |
+| `BAAI/bge-base-en-v1.5` | 768 | Higher accuracy English |
+| `BAAI/bge-large-en-v1.5` | 1024 | Highest accuracy English |
+| `sentence-transformers/all-MiniLM-L6-v2` | 384 | General purpose, lightweight |
+| `sentence-transformers/all-mpnet-base-v2` | 768 | High quality general purpose |
+| `intfloat/multilingual-e5-small` | 384 | 100+ languages |
+| `intfloat/multilingual-e5-base` | 768 | 100+ languages, higher accuracy |
+| `nomic-ai/nomic-embed-text-v1.5` | 768 | Long context (8192 tokens) |
+| `jinaai/jina-embeddings-v2-base-en` | 768 | Long context (8192 tokens) |
 
-## Benchmarks
+## Performance
 
-Performance benchmarks on Apple M1 Max, Ruby 3.3.10, using the default model (BAAI/bge-small-en-v1.5):
+On Apple M1 Max with the default model:
 
-### Single Document Latency
+| Batch Size | Throughput |
+|------------|------------|
+| 1 document | ~6.5ms |
+| 100 documents | ~500 docs/sec |
+| 1000 documents | ~500 docs/sec |
 
-| Text Length | Latency |
-|-------------|---------|
-| Short (~10 tokens) | ~6.5 ms |
-| Medium (~30 tokens) | ~6.5 ms |
-
-### Batch Throughput (100 documents)
-
-| Text Length | Time | Throughput |
-|-------------|------|------------|
-| Short sentences | 0.2s | **502 docs/sec** |
-| Medium paragraphs | 0.5s | **197 docs/sec** |
-| Long documents | 2.3s | **44 docs/sec** |
-
-### Large Scale
-
-| Documents | Time | Throughput |
-|-----------|------|------------|
-| 1,000 short texts | 2.0s | **509 docs/sec** |
-
-### Model Comparison
-
-| Model | Dimensions | Size | Throughput |
-|-------|-----------|------|------------|
-| bge-small-en-v1.5 | 384 | 67 MB | **530 docs/sec** |
-| bge-base-en-v1.5 | 768 | 210 MB | **169 docs/sec** |
-| bge-large-en-v1.5 | 1024 | 1.2 GB | **50 docs/sec** |
-
-### CPU vs CoreML (Apple Silicon)
-
-| Model | CPU | CoreML (best batch) | Ratio |
-|-------|-----|---------------------|-------|
-| bge-small | 418/s | 162/s (batch=64) | CPU 2.6x faster |
-| bge-base | 134/s | 64/s (batch=32) | CPU 2.1x faster |
-| bge-large | 41/s | 23/s (batch=16) | CPU 1.8x faster |
-
-CoreML performance improves with batch sizes 16-64, but CPU still wins. The gap narrows for larger models.
-
-> **Note:** On Apple Silicon, the CPU provider outperforms CoreML for embedding models. The ONNX Runtime CPU implementation is highly optimized for M1/M2 chips. Stick with the default CPU provider.
+Larger models are slower but more accurate. See [benchmarks](BENCHMARKS.md) for details.
 
 ## Configuration
 
-### Custom Cache Directory
-
 ```ruby
-# Set via environment variable
-ENV['FASTEMBED_CACHE_PATH'] = '/path/to/cache'
-
-# Or via constructor
-embedding = Fastembed::TextEmbedding.new(cache_dir: '/path/to/cache')
-```
-
-### Threading
-
-```ruby
-# Control ONNX Runtime threads
-embedding = Fastembed::TextEmbedding.new(threads: 4)
-```
-
-### Execution Providers
-
-```ruby
-# Use CoreML on macOS (not recommended for small models)
-embedding = Fastembed::TextEmbedding.new(
-  providers: ["CoreMLExecutionProvider"]
-)
-
-# Use CUDA on Linux/Windows
-embedding = Fastembed::TextEmbedding.new(
-  providers: ["CUDAExecutionProvider"]
+Fastembed::TextEmbedding.new(
+  model_name: "BAAI/bge-small-en-v1.5",  # Model to use
+  cache_dir: "~/.cache/fastembed",        # Where to store models
+  threads: 4,                              # ONNX Runtime threads
+  providers: ["CUDAExecutionProvider"]     # GPU acceleration (Linux/Windows)
 )
 ```
 
-## Development
+**Environment variables:**
+- `FASTEMBED_CACHE_PATH` - Custom model cache directory
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests.
+## Requirements
 
-```bash
-bundle install
-bundle exec rspec
-```
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub.
-
-## License
-
-The gem is available as open source under the terms of the MIT License.
+- Ruby >= 3.0
+- ~70MB disk space for default model (varies by model)
 
 ## Acknowledgments
 
-- [FastEmbed](https://github.com/qdrant/fastembed) - Original Python implementation by Qdrant
-- [onnxruntime-ruby](https://github.com/ankane/onnxruntime-ruby) - ONNX Runtime bindings for Ruby
-- [tokenizers-ruby](https://github.com/ankane/tokenizers-ruby) - HuggingFace Tokenizers for Ruby
+Ruby port of [FastEmbed](https://github.com/qdrant/fastembed) by Qdrant. Built on [onnxruntime-ruby](https://github.com/ankane/onnxruntime-ruby) and [tokenizers-ruby](https://github.com/ankane/tokenizers-ruby) by Andrew Kane.
+
+## License
+
+MIT
