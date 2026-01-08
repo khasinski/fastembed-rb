@@ -21,3 +21,4 @@ Gemfile.lock
 
 # MacOS
 .DS_Store
+*.gem
