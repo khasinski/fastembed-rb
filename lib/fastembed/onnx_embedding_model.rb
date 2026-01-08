@@ -8,10 +8,11 @@ module Fastembed
   class OnnxEmbeddingModel
     attr_reader :model_info, :model_dir
 
-    def initialize(model_info, model_dir, threads: nil)
+    def initialize(model_info, model_dir, threads: nil, providers: nil)
       @model_info = model_info
       @model_dir = model_dir
       @threads = threads
+      @providers = providers
 
       load_model
       load_tokenizer
@@ -43,6 +44,7 @@ module Fastembed
       session_options = {}
       session_options[:inter_op_num_threads] = @threads if @threads
       session_options[:intra_op_num_threads] = @threads if @threads
+      session_options[:providers] = @providers if @providers
 
       @session = OnnxRuntime::InferenceSession.new(model_path, **session_options)
     end

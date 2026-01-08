@@ -23,15 +23,18 @@ module Fastembed
     # @param model_name [String] Name of the model to use (default: "BAAI/bge-small-en-v1.5")
     # @param cache_dir [String, nil] Custom cache directory for models
     # @param threads [Integer, nil] Number of threads for ONNX Runtime
+    # @param providers [Array<String>, nil] ONNX execution providers (e.g., ["CoreMLExecutionProvider"])
     # @param show_progress [Boolean] Whether to show download progress
     def initialize(
       model_name: DEFAULT_MODEL,
       cache_dir: nil,
       threads: nil,
+      providers: nil,
       show_progress: true
     )
       @model_name = model_name
       @threads = threads
+      @providers = providers
       @show_progress = show_progress
 
       # Set custom cache directory if provided
@@ -43,7 +46,7 @@ module Fastembed
 
       # Download and load model
       @model_dir = ModelManagement.retrieve_model(model_name, show_progress: show_progress)
-      @model = OnnxEmbeddingModel.new(@model_info, @model_dir, threads: threads)
+      @model = OnnxEmbeddingModel.new(@model_info, @model_dir, threads: threads, providers: providers)
     end
 
     # Generate embeddings for documents

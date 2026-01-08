@@ -131,7 +131,16 @@ Performance benchmarks on Apple M1 Max, Ruby 3.3.10, using the default model (BA
 
 | Documents | Time | Throughput |
 |-----------|------|------------|
-| 1,000 short texts | 2.1s | **484 docs/sec** |
+| 1,000 short texts | 2.0s | **509 docs/sec** |
+
+### Execution Providers
+
+| Provider | 100 Short Texts | 1,000 Texts | Notes |
+|----------|-----------------|-------------|-------|
+| CPU (default) | 530 docs/sec | 509 docs/sec | Recommended |
+| CoreML | 131 docs/sec | 188 docs/sec | Slower due to data transfer overhead |
+
+> **Note:** For small embedding models like bge-small, the CPU provider is faster than CoreML/GPU. The overhead of transferring data to the Neural Engine outweighs the acceleration benefits. Stick with the default CPU provider.
 
 ## Configuration
 
@@ -150,6 +159,20 @@ embedding = Fastembed::TextEmbedding.new(cache_dir: '/path/to/cache')
 ```ruby
 # Control ONNX Runtime threads
 embedding = Fastembed::TextEmbedding.new(threads: 4)
+```
+
+### Execution Providers
+
+```ruby
+# Use CoreML on macOS (not recommended for small models)
+embedding = Fastembed::TextEmbedding.new(
+  providers: ["CoreMLExecutionProvider"]
+)
+
+# Use CUDA on Linux/Windows
+embedding = Fastembed::TextEmbedding.new(
+  providers: ["CUDAExecutionProvider"]
+)
 ```
 
 ## Development
