@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = "Fast, lightweight text embeddings for Ruby"
   spec.description   = "A Ruby port of FastEmbed - a lightweight, fast library for generating text embeddings using ONNX Runtime"
-  spec.homepage      = "https://github.com/hasik/fastembed-rb"
+  spec.homepage      = "https://github.com/khasinski/fastembed-rb"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
 
