@@ -133,14 +133,23 @@ Performance benchmarks on Apple M1 Max, Ruby 3.3.10, using the default model (BA
 |-----------|------|------------|
 | 1,000 short texts | 2.0s | **509 docs/sec** |
 
-### Execution Providers
+### Model Comparison
 
-| Provider | 100 Short Texts | 1,000 Texts | Notes |
-|----------|-----------------|-------------|-------|
-| CPU (default) | 530 docs/sec | 509 docs/sec | Recommended |
-| CoreML | 131 docs/sec | 188 docs/sec | Slower due to data transfer overhead |
+| Model | Dimensions | Size | Throughput |
+|-------|-----------|------|------------|
+| bge-small-en-v1.5 | 384 | 67 MB | **530 docs/sec** |
+| bge-base-en-v1.5 | 768 | 210 MB | **169 docs/sec** |
+| bge-large-en-v1.5 | 1024 | 1.2 GB | **50 docs/sec** |
 
-> **Note:** For small embedding models like bge-small, the CPU provider is faster than CoreML/GPU. The overhead of transferring data to the Neural Engine outweighs the acceleration benefits. Stick with the default CPU provider.
+### CPU vs CoreML (Apple Silicon)
+
+| Model | CPU | CoreML | Winner |
+|-------|-----|--------|--------|
+| bge-small | 530 docs/sec | 131 docs/sec | CPU (4x faster) |
+| bge-base | 169 docs/sec | 69 docs/sec | CPU (2.5x faster) |
+| bge-large | 50 docs/sec | 16 docs/sec | CPU (3x faster) |
+
+> **Note:** On Apple Silicon, the CPU provider consistently outperforms CoreML for embedding models. The ONNX Runtime CPU implementation is highly optimized for M1/M2 chips. Stick with the default CPU provider.
 
 ## Configuration
 
