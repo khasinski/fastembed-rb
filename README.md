@@ -151,7 +151,7 @@ Fastembed::TextEmbedding.new(
 
 ## Requirements
 
-- Ruby >= 3.0
+- Ruby >= 3.3
 - ~70MB disk space for default model (varies by model)
 
 ## Acknowledgments
