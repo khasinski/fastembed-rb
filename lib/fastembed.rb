@@ -8,7 +8,9 @@ module Fastembed
 end
 
 require_relative 'fastembed/model_info'
+require_relative 'fastembed/reranker_model_info'
 require_relative 'fastembed/model_management'
 require_relative 'fastembed/pooling'
 require_relative 'fastembed/onnx_embedding_model'
 require_relative 'fastembed/text_embedding'
+require_relative 'fastembed/text_cross_encoder'

@@ -13,6 +13,7 @@ This document outlines features from the original [FastEmbed Python library](htt
 - Configurable batch size and threading
 - CoreML execution provider support
 - CLI tool (`fastembed`)
+- **Reranking / Cross-Encoder models** (5 models)
 
 ## Feature Gap Analysis
 
@@ -58,29 +59,9 @@ result = colbert.embed(["hello world"]).first
 - Different pooling strategy (no pooling, keep all tokens)
 - Scoring requires MaxSim operation between query and document tokens
 
-#### 3. Reranking / Cross-Encoder Models
-Cross-encoders score query-document pairs directly rather than comparing embeddings. More accurate but slower (O(n) vs O(1) per comparison).
+#### ~~3. Reranking / Cross-Encoder Models~~ ✅ IMPLEMENTED
 
-**Models to support:**
-- `Xenova/ms-marco-MiniLM-L-6-v2` (0.08 GB)
-- `Xenova/ms-marco-MiniLM-L-12-v2` (0.12 GB)
-- `BAAI/bge-reranker-base` (1.11 GB)
-- `jinaai/jina-reranker-v1-turbo-en` (0.13 GB)
-
-**API design:**
-```ruby
-reranker = Fastembed::TextCrossEncoder.new
-scores = reranker.rerank(
-  query: "What is machine learning?",
-  documents: ["ML is a subset of AI...", "The weather is nice..."]
-)
-# => [0.95, 0.12]
-```
-
-**Implementation notes:**
-- Takes query + document pairs as input
-- Returns relevance scores (not embeddings)
-- Different ONNX model architecture (sequence classification)
+See `Fastembed::TextCrossEncoder` class.
 
 ### Medium Priority
 

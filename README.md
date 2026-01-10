@@ -131,6 +131,42 @@ fastembed embed -f csv "Hello world"
 fastembed embed -m "BAAI/bge-base-en-v1.5" "Hello world"
 ```
 
+## Reranking
+
+Rerankers score query-document pairs directly for more accurate relevance ranking. Use them to re-score results from embedding-based retrieval:
+
+```ruby
+reranker = Fastembed::TextCrossEncoder.new
+
+# Get relevance scores
+scores = reranker.rerank(
+  query: "What is machine learning?",
+  documents: [
+    "Machine learning is a subset of AI.",
+    "The weather is nice today.",
+    "Deep learning uses neural networks."
+  ]
+)
+# => [10.5, -11.2, -5.3]  (higher = more relevant)
+
+# Get sorted results with scores
+results = reranker.rerank_with_scores(
+  query: "What is machine learning?",
+  documents: documents,
+  top_k: 2  # Return top 2 results
+)
+# => [{document: "Machine learning...", score: 10.5, index: 0}, ...]
+```
+
+### Supported Reranker Models
+
+| Model | Size | Use Case |
+|-------|------|----------|
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | 80MB | Default, fast reranking |
+| `cross-encoder/ms-marco-MiniLM-L-12-v2` | 120MB | Better accuracy |
+| `BAAI/bge-reranker-base` | 1.1GB | High accuracy |
+| `BAAI/bge-reranker-large` | 2.2GB | Highest accuracy |
+
 ## Supported Models
 
 | Model | Dim | Use Case |

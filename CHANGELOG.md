@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `TextCrossEncoder` class for reranking query-document pairs
+- Support for cross-encoder/reranker models:
+  - cross-encoder/ms-marco-MiniLM-L-6-v2 (default)
+  - cross-encoder/ms-marco-MiniLM-L-12-v2
+  - BAAI/bge-reranker-base
+  - BAAI/bge-reranker-large
+  - jinaai/jina-reranker-v1-turbo-en
+- `rerank` method for scoring query-document pairs
+- `rerank_with_scores` method for sorted results with top_k support
+- CLI tool (`fastembed`) with `embed` and `list-models` commands
+- Comprehensive benchmark suite comparing Ruby vs Python performance
+
 ## [1.0.0] - 2025-01-08
 
 ### Added

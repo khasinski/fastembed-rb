@@ -32,8 +32,11 @@ module Fastembed
       attr_writer :cache_dir
 
       # Returns the path to a cached model, downloading if necessary
-      def retrieve_model(model_name, show_progress: true)
-        model_info = resolve_model_info(model_name)
+      # @param model_name [String] Name of the model
+      # @param model_info [ModelInfo, RerankerModelInfo, nil] Optional pre-resolved model info
+      # @param show_progress [Boolean] Whether to show download progress
+      def retrieve_model(model_name, model_info: nil, show_progress: true)
+        model_info ||= resolve_model_info(model_name)
         model_dir = model_directory(model_info)
 
         # Check if model is already cached
