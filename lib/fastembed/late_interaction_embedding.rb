@@ -92,8 +92,7 @@ module Fastembed
       )
 
       @dim = @model_info.dim
-      load_model
-      load_tokenizer
+      setup_model_and_tokenizer
     end
 
     # Generate late interaction embeddings for documents
@@ -102,14 +101,8 @@ module Fastembed
     # @param batch_size [Integer] Number of documents to process at once
     # @return [Enumerator] Lazy enumerator yielding LateInteractionEmbedding objects
     def embed(documents, batch_size: 32)
-      raise ArgumentError, 'documents cannot be nil' if documents.nil?
-
-      documents = [documents] if documents.is_a?(String)
+      documents = Validators.validate_documents!(documents)
       return Enumerator.new { |_| } if documents.empty?
-
-      documents.each_with_index do |doc, i|
-        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
-      end
 
       Enumerator.new do |yielder|
         documents.each_slice(batch_size) do |batch|
@@ -160,33 +153,9 @@ module Fastembed
       info
     end
 
-    def load_model
-      model_path = File.join(@model_dir, @model_info.model_file)
-      @session = load_onnx_session(model_path, providers: @providers)
-    end
-
-    def load_tokenizer
-      tokenizer_path = File.join(@model_dir, @model_info.tokenizer_file)
-      @tokenizer = load_tokenizer_from_file(tokenizer_path, max_length: @model_info.max_length)
-    end
-
     def compute_embeddings(texts)
-      # Tokenize
-      encodings = @tokenizer.encode_batch(texts)
-
-      # Prepare inputs
-      input_ids = encodings.map(&:ids)
-      attention_mask = encodings.map(&:attention_mask)
-      token_type_ids = encodings.map { |e| e.type_ids || Array.new(e.ids.length, 0) }
-
-      inputs = {
-        'input_ids' => input_ids,
-        'attention_mask' => attention_mask
-      }
-      inputs['token_type_ids'] = token_type_ids if input_names.include?('token_type_ids')
-
-      # Run inference
-      outputs = @session.run(nil, inputs)
+      prepared = tokenize_and_prepare(texts)
+      outputs = @session.run(nil, prepared[:inputs])
       token_embeddings = extract_token_embeddings(outputs)
 
       # Create LateInteractionEmbedding for each document
@@ -194,14 +163,10 @@ module Fastembed
         # Filter out padding tokens using attention mask
         valid_embeddings = []
         token_embeddings[i].each_with_index do |emb, j|
-          valid_embeddings << normalize_vector(emb) if attention_mask[i][j] == 1
+          valid_embeddings << normalize_vector(emb) if prepared[:attention_mask][i][j] == 1
         end
         LateInteractionEmbedding.new(valid_embeddings)
       end
-    end
-
-    def input_names
-      @input_names ||= @session.inputs.map { |i| i[:name] }
     end
 
     def extract_token_embeddings(outputs)

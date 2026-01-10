@@ -45,8 +45,7 @@ module Fastembed
         show_progress: true
       )
 
-      load_model
-      load_tokenizer
+      setup_model_and_tokenizer
     end
 
     # Score query-document pairs and return relevance scores
@@ -57,14 +56,8 @@ module Fastembed
     # @return [Array<Float>] Relevance scores for each document (higher = more relevant)
     # @raise [ArgumentError] If query or documents is nil, or documents contains nil
     def rerank(query:, documents:, batch_size: 64)
-      raise ArgumentError, 'query cannot be nil' if query.nil?
-      raise ArgumentError, 'documents cannot be nil' if documents.nil?
-
+      Validators.validate_rerank_input!(query: query, documents: documents)
       return [] if documents.empty?
-
-      documents.each_with_index do |doc, i|
-        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
-      end
 
       scores = []
       documents.each_slice(batch_size) do |batch|
@@ -108,19 +101,9 @@ module Fastembed
       info
     end
 
-    def load_model
-      model_path = File.join(@model_dir, @model_info.model_file)
-      @session = load_onnx_session(model_path, providers: @providers)
-    end
-
-    def load_tokenizer
-      tokenizer_path = File.join(@model_dir, @model_info.tokenizer_file)
-      @tokenizer = load_tokenizer_from_file(tokenizer_path, max_length: @model_info.max_length)
-    end
-
     def score_pairs(query, documents)
       encodings = tokenize_pairs(query, documents)
-      inputs = prepare_model_inputs(encodings)
+      inputs = prepare_pair_inputs(encodings)
       extract_scores(@session.run(nil, inputs))
     end
 
@@ -128,7 +111,7 @@ module Fastembed
       documents.map { |doc| @tokenizer.encode(query, doc) }
     end
 
-    def prepare_model_inputs(encodings)
+    def prepare_pair_inputs(encodings)
       max_len = encodings.map { |e| e.ids.length }.max
 
       input_ids = []

@@ -98,15 +98,8 @@ module Fastembed
     #   end.to_a
     #
     def embed(documents, batch_size: 256, &progress_callback)
-      raise ArgumentError, 'documents cannot be nil' if documents.nil?
-
-      documents = [documents] if documents.is_a?(String)
+      documents = Validators.validate_documents!(documents)
       return Enumerator.new { |_| } if documents.empty?
-
-      # Validate all documents
-      documents.each_with_index do |doc, i|
-        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
-      end
 
       total_batches = (documents.length.to_f / batch_size).ceil
 

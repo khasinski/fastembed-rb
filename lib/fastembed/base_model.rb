@@ -121,5 +121,59 @@ module Fastembed
       tokenizer.enable_truncation(max_length)
       tokenizer
     end
+
+    # Load both ONNX model and tokenizer using model_info paths
+    #
+    # Sets @session and @tokenizer instance variables.
+    # Uses @model_dir and @model_info which must be set first.
+    #
+    # @param model_file_override [String, nil] Override model file path
+    # @return [void]
+    def setup_model_and_tokenizer(model_file_override: nil)
+      model_file = model_file_override || @model_info.model_file
+      model_path = File.join(@model_dir, model_file)
+      @session = load_onnx_session(model_path, providers: @providers)
+
+      tokenizer_path = File.join(@model_dir, @model_info.tokenizer_file)
+      @tokenizer = load_tokenizer_from_file(tokenizer_path, max_length: @model_info.max_length)
+    end
+
+    # Get input names from the ONNX session
+    #
+    # @return [Array<String>] List of input tensor names
+    def session_input_names
+      @session_input_names ||= @session.inputs.map { |i| i[:name] }
+    end
+
+    # Prepare model inputs from tokenizer encodings
+    #
+    # @param encodings [Array<Tokenizers::Encoding>] Batch of tokenizer encodings
+    # @return [Hash] Input tensors for ONNX session
+    def prepare_model_inputs(encodings)
+      input_ids = encodings.map(&:ids)
+      attention_mask = encodings.map(&:attention_mask)
+
+      inputs = {
+        'input_ids' => input_ids,
+        'attention_mask' => attention_mask
+      }
+
+      if session_input_names.include?('token_type_ids')
+        token_type_ids = encodings.map { |e| e.type_ids || Array.new(e.ids.length, 0) }
+        inputs['token_type_ids'] = token_type_ids
+      end
+
+      inputs
+    end
+
+    # Tokenize texts and prepare inputs for the model
+    #
+    # @param texts [Array<String>] Texts to tokenize
+    # @return [Hash] Hash with :inputs and :attention_mask keys
+    def tokenize_and_prepare(texts)
+      encodings = @tokenizer.encode_batch(texts)
+      inputs = prepare_model_inputs(encodings)
+      { inputs: inputs, attention_mask: encodings.map(&:attention_mask) }
+    end
   end
 end

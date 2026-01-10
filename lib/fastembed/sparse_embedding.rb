@@ -67,8 +67,7 @@ module Fastembed
         show_progress: show_progress
       )
 
-      load_model
-      load_tokenizer
+      setup_model_and_tokenizer
     end
 
     # Generate sparse embeddings for documents
@@ -77,14 +76,8 @@ module Fastembed
     # @param batch_size [Integer] Number of documents to process at once
     # @return [Enumerator] Lazy enumerator yielding SparseEmbedding objects
     def embed(documents, batch_size: 32)
-      raise ArgumentError, 'documents cannot be nil' if documents.nil?
-
-      documents = [documents] if documents.is_a?(String)
+      documents = Validators.validate_documents!(documents)
       return Enumerator.new { |_| } if documents.empty?
-
-      documents.each_with_index do |doc, i|
-        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
-      end
 
       Enumerator.new do |yielder|
         documents.each_slice(batch_size) do |batch|
@@ -121,43 +114,15 @@ module Fastembed
       info
     end
 
-    def load_model
-      model_path = File.join(@model_dir, @model_info.model_file)
-      @session = load_onnx_session(model_path, providers: @providers)
-    end
-
-    def load_tokenizer
-      tokenizer_path = File.join(@model_dir, @model_info.tokenizer_file)
-      @tokenizer = load_tokenizer_from_file(tokenizer_path, max_length: @model_info.max_length)
-    end
-
     def compute_sparse_embeddings(texts)
-      # Tokenize
-      encodings = @tokenizer.encode_batch(texts)
-
-      # Prepare inputs
-      input_ids = encodings.map(&:ids)
-      attention_mask = encodings.map(&:attention_mask)
-      token_type_ids = encodings.map { |e| e.type_ids || Array.new(e.ids.length, 0) }
-
-      inputs = {
-        'input_ids' => input_ids,
-        'attention_mask' => attention_mask
-      }
-      inputs['token_type_ids'] = token_type_ids if input_names.include?('token_type_ids')
-
-      # Run inference
-      outputs = @session.run(nil, inputs)
+      prepared = tokenize_and_prepare(texts)
+      outputs = @session.run(nil, prepared[:inputs])
       logits = extract_logits(outputs)
 
       # Convert to sparse embeddings
       texts.length.times.map do |i|
-        create_sparse_embedding(logits[i], attention_mask[i])
+        create_sparse_embedding(logits[i], prepared[:attention_mask][i])
       end
-    end
-
-    def input_names
-      @input_names ||= @session.inputs.map { |i| i[:name] }
     end
 
     def extract_logits(outputs)
