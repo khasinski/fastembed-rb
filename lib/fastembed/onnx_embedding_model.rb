@@ -57,7 +57,7 @@ module Fastembed
 
       # Configure tokenizer for batch encoding
       @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
-      @tokenizer.enable_truncation(512)
+      @tokenizer.enable_truncation(model_info.max_length)
     end
 
     def tokenize(texts)

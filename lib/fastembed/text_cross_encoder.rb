@@ -133,7 +133,7 @@ module Fastembed
       raise Error, "Tokenizer not found: #{tokenizer_path}" unless File.exist?(tokenizer_path)
 
       @tokenizer = Tokenizers::Tokenizer.from_file(tokenizer_path)
-      @tokenizer.enable_truncation(512)
+      @tokenizer.enable_truncation(@model_info.max_length)
       @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
     end
 

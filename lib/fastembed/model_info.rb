@@ -16,7 +16,8 @@ module Fastembed
       model_file: 'model.onnx',
       tokenizer_file: 'tokenizer.json',
       pooling: :mean,
-      normalize: true
+      normalize: true,
+      max_length: BaseModelInfo::DEFAULT_MAX_LENGTH
     )
       initialize_base(
         model_name: model_name,
@@ -24,7 +25,8 @@ module Fastembed
         size_in_gb: size_in_gb,
         sources: sources,
         model_file: model_file,
-        tokenizer_file: tokenizer_file
+        tokenizer_file: tokenizer_file,
+        max_length: max_length
       )
       @dim = dim
       @pooling = pooling
@@ -41,7 +43,8 @@ module Fastembed
         model_file: model_file,
         tokenizer_file: tokenizer_file,
         pooling: pooling,
-        normalize: normalize
+        normalize: normalize,
+        max_length: max_length
       }
     end
   end
@@ -102,7 +105,8 @@ module Fastembed
       description: 'Long context (8192 tokens) English embedding model',
       size_in_gb: 0.52,
       sources: { hf: 'nomic-ai/nomic-embed-text-v1' },
-      model_file: 'onnx/model.onnx'
+      model_file: 'onnx/model.onnx',
+      max_length: 8192
     ),
     'nomic-ai/nomic-embed-text-v1.5' => ModelInfo.new(
       model_name: 'nomic-ai/nomic-embed-text-v1.5',
@@ -110,7 +114,8 @@ module Fastembed
       description: 'Improved long context embedding with Matryoshka support',
       size_in_gb: 0.52,
       sources: { hf: 'nomic-ai/nomic-embed-text-v1.5' },
-      model_file: 'onnx/model.onnx'
+      model_file: 'onnx/model.onnx',
+      max_length: 8192
     ),
     'jinaai/jina-embeddings-v2-small-en' => ModelInfo.new(
       model_name: 'jinaai/jina-embeddings-v2-small-en',
@@ -118,7 +123,8 @@ module Fastembed
       description: 'Small English embedding with 8192 token context',
       size_in_gb: 0.06,
       sources: { hf: 'Xenova/jina-embeddings-v2-small-en' },
-      model_file: 'onnx/model.onnx'
+      model_file: 'onnx/model.onnx',
+      max_length: 8192
     ),
     'jinaai/jina-embeddings-v2-base-en' => ModelInfo.new(
       model_name: 'jinaai/jina-embeddings-v2-base-en',
@@ -126,7 +132,8 @@ module Fastembed
       description: 'Base English embedding with 8192 token context',
       size_in_gb: 0.52,
       sources: { hf: 'Xenova/jina-embeddings-v2-base-en' },
-      model_file: 'onnx/model.onnx'
+      model_file: 'onnx/model.onnx',
+      max_length: 8192
     ),
     'sentence-transformers/paraphrase-MiniLM-L6-v2' => ModelInfo.new(
       model_name: 'sentence-transformers/paraphrase-MiniLM-L6-v2',

@@ -27,6 +27,23 @@ RSpec.describe Fastembed::ModelInfo do
         expect(info.hf_repo).not_to be_nil, "Model #{name} missing HF repo"
       end
     end
+
+    it 'has default max_length for standard models' do
+      model = Fastembed::SUPPORTED_MODELS['BAAI/bge-small-en-v1.5']
+      expect(model.max_length).to eq(512)
+    end
+
+    it 'has extended max_length for long-context models' do
+      %w[
+        nomic-ai/nomic-embed-text-v1
+        nomic-ai/nomic-embed-text-v1.5
+        jinaai/jina-embeddings-v2-small-en
+        jinaai/jina-embeddings-v2-base-en
+      ].each do |name|
+        model = Fastembed::SUPPORTED_MODELS[name]
+        expect(model.max_length).to eq(8192), "Model #{name} should have max_length 8192"
+      end
+    end
   end
 
   describe '#to_h' do
