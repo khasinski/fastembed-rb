@@ -84,13 +84,20 @@ module Fastembed
     #
     # @param documents [Array<String>, String] Text document(s) to embed
     # @param batch_size [Integer] Number of documents to process at once
+    # @yield [Progress] Optional progress callback called after each batch
     # @return [Enumerator] Lazy enumerator yielding embedding vectors
     # @raise [ArgumentError] If documents is nil or contains nil values
     #
-    # @example
+    # @example Basic usage
     #   vectors = embedding.embed(["Hello", "World"]).to_a
     #   # => [[0.1, 0.2, ...], [0.3, 0.4, ...]]
-    def embed(documents, batch_size: 256)
+    #
+    # @example With progress callback
+    #   embedding.embed(documents, batch_size: 64) do |progress|
+    #     puts "#{progress.percent}% complete"
+    #   end.to_a
+    #
+    def embed(documents, batch_size: 256, &progress_callback)
       raise ArgumentError, 'documents cannot be nil' if documents.nil?
 
       documents = [documents] if documents.is_a?(String)
@@ -101,10 +108,17 @@ module Fastembed
         raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
       end
 
+      total_batches = (documents.length.to_f / batch_size).ceil
+
       Enumerator.new do |yielder|
-        documents.each_slice(batch_size) do |batch|
+        documents.each_slice(batch_size).with_index(1) do |batch, batch_num|
           embeddings = @model.embed(batch)
           embeddings.each { |embedding| yielder << embedding }
+
+          if progress_callback
+            progress = Progress.new(current: batch_num, total: total_batches, batch_size: batch_size)
+            progress_callback.call(progress)
+          end
         end
       end
     end
