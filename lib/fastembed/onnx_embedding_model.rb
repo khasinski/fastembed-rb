@@ -53,7 +53,7 @@ module Fastembed
       tokenizer_path = File.join(model_dir, model_info.tokenizer_file)
       raise Error, "Tokenizer file not found: #{tokenizer_path}" unless File.exist?(tokenizer_path)
 
-      @tokenizer = Tokenizers.from_file(tokenizer_path)
+      @tokenizer = Tokenizers::Tokenizer.from_file(tokenizer_path)
 
       # Configure tokenizer for batch encoding
       @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
