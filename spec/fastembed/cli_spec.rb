@@ -45,7 +45,29 @@ RSpec.describe Fastembed::CLI do
 
     it 'works with models alias' do
       cli = described_class.new(['models'])
-      expect { cli.run }.to output(/Available models/).to_stdout
+      expect { cli.run }.to output(/Available embedding models/).to_stdout
+    end
+  end
+
+  describe 'list-rerankers command' do
+    it 'lists all supported reranker models' do
+      cli = described_class.new(['list-rerankers'])
+      expect { cli.run }.to output(%r{cross-encoder/ms-marco-MiniLM-L-6-v2}).to_stdout
+    end
+
+    it 'shows model size' do
+      cli = described_class.new(['list-rerankers'])
+      expect { cli.run }.to output(/Size:.*GB/).to_stdout
+    end
+
+    it 'works with rerankers alias' do
+      cli = described_class.new(['rerankers'])
+      expect { cli.run }.to output(/Available reranker models/).to_stdout
+    end
+
+    it 'shows model descriptions' do
+      cli = described_class.new(['list-rerankers'])
+      expect { cli.run }.to output(/Description:/).to_stdout
     end
   end
 
@@ -149,6 +171,95 @@ RSpec.describe Fastembed::CLI do
       cli = described_class.new(['rerank', '-q', 'test'])
       allow($stdin).to receive(:tty?).and_return(true)
       expect { cli.run }.to output(/No documents provided/).to_stderr.and raise_error(SystemExit)
+    end
+  end
+
+  describe 'cache command' do
+    let(:tmp_cache_dir) { Dir.mktmpdir('fastembed-cli-test') }
+
+    before do
+      Fastembed::ModelManagement.cache_dir = tmp_cache_dir
+    end
+
+    after do
+      FileUtils.rm_rf(tmp_cache_dir)
+      Fastembed::ModelManagement.cache_dir = nil
+    end
+
+    describe 'cache help' do
+      it 'shows help with no subcommand' do
+        cli = described_class.new(['cache'])
+        expect { cli.run }.to output(/Usage: fastembed cache/).to_stdout
+      end
+
+      it 'shows help with --help' do
+        cli = described_class.new(['cache', '--help'])
+        expect { cli.run }.to output(/Subcommands:/).to_stdout
+      end
+    end
+
+    describe 'cache info' do
+      it 'shows cache directory' do
+        cli = described_class.new(['cache', 'info'])
+        expect { cli.run }.to output(/Cache directory:/).to_stdout
+      end
+
+      it 'shows no models when cache is empty' do
+        cli = described_class.new(['cache', 'info'])
+        expect { cli.run }.to output(/No models cached/).to_stdout
+      end
+
+      it 'lists cached models with sizes' do
+        # Create a fake cached model
+        model_dir = File.join(tmp_cache_dir, 'models', 'test--model')
+        FileUtils.mkdir_p(model_dir)
+        File.write(File.join(model_dir, 'model.onnx'), 'x' * 1024)
+
+        cli = described_class.new(['cache', 'info'])
+        output = capture_stdout { cli.run }
+
+        expect(output).to include('test/model')
+        expect(output).to include('1 model(s)')
+      end
+    end
+
+    describe 'cache clear' do
+      it 'reports empty cache when no models' do
+        cli = described_class.new(['cache', 'clear'])
+        expect { cli.run }.to output(/Cache is empty/).to_stdout
+      end
+
+      it 'prompts for confirmation and clears on yes' do
+        # Create a fake cached model
+        model_dir = File.join(tmp_cache_dir, 'models', 'test--model')
+        FileUtils.mkdir_p(model_dir)
+        File.write(File.join(model_dir, 'model.onnx'), 'test')
+
+        cli = described_class.new(['cache', 'clear'])
+        allow($stdin).to receive(:gets).and_return("y\n")
+
+        expect { cli.run }.to output(/Remove 1 cached model.*Cache cleared/m).to_stdout
+        expect(Dir.exist?(model_dir)).to be false
+      end
+
+      it 'aborts on no' do
+        model_dir = File.join(tmp_cache_dir, 'models', 'test--model')
+        FileUtils.mkdir_p(model_dir)
+        File.write(File.join(model_dir, 'model.onnx'), 'test')
+
+        cli = described_class.new(['cache', 'clear'])
+        allow($stdin).to receive(:gets).and_return("n\n")
+
+        expect { cli.run }.to output(/Aborted/).to_stdout
+        expect(Dir.exist?(model_dir)).to be true
+      end
+    end
+
+    describe 'unknown subcommand' do
+      it 'shows error' do
+        cli = described_class.new(['cache', 'unknown'])
+        expect { cli.run }.to output(/Unknown cache subcommand/).to_stderr.and raise_error(SystemExit)
+      end
     end
   end
 

@@ -26,10 +26,14 @@ module Fastembed
       case command
       when 'list-models', 'models'
         list_models
+      when 'list-rerankers', 'rerankers'
+        list_rerankers
       when 'embed'
         embed
       when 'rerank'
         rerank
+      when 'cache'
+        cache_command
       when 'version', '-v', '--version'
         puts "fastembed #{Fastembed::VERSION}"
       when 'help', nil
@@ -71,22 +75,35 @@ module Fastembed
         Usage: fastembed <command> [options]
 
         Commands:
-          embed         Generate embeddings for text
-          rerank        Rerank documents by relevance to a query
-          list-models   List available embedding models
-          version       Show version
-          help          Show this help message
+          embed           Generate embeddings for text
+          rerank          Rerank documents by relevance to a query
+          list-models     List available embedding models
+          list-rerankers  List available reranker models
+          cache           Manage model cache (clear, info)
+          version         Show version
+          help            Show this help message
 
         Run 'fastembed <command> --help' for command-specific options.
       HELP
     end
 
     def list_models
-      puts 'Available models:'
+      puts 'Available embedding models:'
       puts
       Fastembed::SUPPORTED_MODELS.each_value do |model|
         puts "  #{model.model_name}"
         puts "    Dimensions: #{model.dim}"
+        puts "    Description: #{model.description}"
+        puts
+      end
+    end
+
+    def list_rerankers
+      puts 'Available reranker models:'
+      puts
+      Fastembed::SUPPORTED_RERANKER_MODELS.each_value do |model|
+        puts "  #{model.model_name}"
+        puts "    Size: #{model.size_in_gb} GB"
         puts "    Description: #{model.description}"
         puts
       end
@@ -232,6 +249,115 @@ module Fastembed
         puts JSON.pretty_generate(results)
       when 'ndjson'
         results.each { |r| puts JSON.generate(r) }
+      end
+    end
+
+    def cache_command
+      subcommand = @argv.shift
+
+      case subcommand
+      when 'clear'
+        cache_clear
+      when 'info'
+        cache_info
+      when 'help', nil, '--help', '-h'
+        puts cache_help
+      else
+        warn "Unknown cache subcommand: #{subcommand}"
+        warn cache_help
+        exit 1
+      end
+    end
+
+    def cache_help
+      <<~HELP
+        Usage: fastembed cache <subcommand>
+
+        Subcommands:
+          clear   Remove all cached models
+          info    Show cache directory and size
+
+        Examples:
+          fastembed cache info
+          fastembed cache clear
+      HELP
+    end
+
+    def cache_clear
+      cache_path = ModelManagement.cache_dir
+      models_path = File.join(cache_path, 'models')
+
+      unless Dir.exist?(models_path)
+        puts 'Cache is empty.'
+        return
+      end
+
+      # Count models before clearing
+      model_count = Dir.glob(File.join(models_path, '*')).count { |f| File.directory?(f) }
+
+      if model_count.zero?
+        puts 'Cache is empty.'
+        return
+      end
+
+      print "Remove #{model_count} cached model(s)? [y/N] "
+      response = $stdin.gets&.strip&.downcase
+
+      if response == 'y'
+        FileUtils.rm_rf(models_path)
+        puts 'Cache cleared.'
+      else
+        puts 'Aborted.'
+      end
+    end
+
+    def cache_info
+      cache_path = ModelManagement.cache_dir
+      models_path = File.join(cache_path, 'models')
+
+      puts "Cache directory: #{cache_path}"
+      puts
+
+      unless Dir.exist?(models_path)
+        puts 'No models cached.'
+        return
+      end
+
+      models = Dir.glob(File.join(models_path, '*')).select { |f| File.directory?(f) }
+
+      if models.empty?
+        puts 'No models cached.'
+        return
+      end
+
+      total_size = 0
+      puts 'Cached models:'
+      models.each do |model_dir|
+        name = File.basename(model_dir).gsub('--', '/')
+        size = directory_size(model_dir)
+        total_size += size
+        puts "  #{name} (#{format_size(size)})"
+      end
+
+      puts
+      puts "Total: #{models.count} model(s), #{format_size(total_size)}"
+    end
+
+    def directory_size(path)
+      Dir.glob(File.join(path, '**', '*'))
+         .select { |f| File.file?(f) }
+         .sum { |f| File.size(f) }
+    end
+
+    def format_size(bytes)
+      if bytes >= 1_073_741_824
+        format('%.2f GB', bytes / 1_073_741_824.0)
+      elsif bytes >= 1_048_576
+        format('%.2f MB', bytes / 1_048_576.0)
+      elsif bytes >= 1024
+        format('%.2f KB', bytes / 1024.0)
+      else
+        "#{bytes} B"
       end
     end
   end
