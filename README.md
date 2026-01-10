@@ -109,6 +109,28 @@ Fastembed::TextEmbedding.list_supported_models.each do |model|
 end
 ```
 
+## CLI
+
+FastEmbed includes a command-line interface:
+
+```bash
+# List available models
+fastembed list-models
+
+# Embed text (outputs JSON)
+fastembed embed "Hello world" "Another text"
+
+# Pipe text from stdin
+echo -e "Hello\nWorld" | fastembed embed
+
+# Different output formats
+fastembed embed -f ndjson "Hello world"
+fastembed embed -f csv "Hello world"
+
+# Use a different model
+fastembed embed -m "BAAI/bge-base-en-v1.5" "Hello world"
+```
+
 ## Supported Models
 
 | Model | Dim | Use Case |
