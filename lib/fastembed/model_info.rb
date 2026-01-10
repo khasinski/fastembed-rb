@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 module Fastembed
-  # Model information structure
+  # Model information for embedding models
   class ModelInfo
-    attr_reader :model_name, :dim, :description, :size_in_gb, :model_file,
-                :tokenizer_file, :sources, :pooling, :normalize
+    include BaseModelInfo
+
+    attr_reader :dim, :pooling, :normalize
 
     def initialize(
       model_name:,
@@ -17,19 +18,17 @@ module Fastembed
       pooling: :mean,
       normalize: true
     )
-      @model_name = model_name
+      initialize_base(
+        model_name: model_name,
+        description: description,
+        size_in_gb: size_in_gb,
+        sources: sources,
+        model_file: model_file,
+        tokenizer_file: tokenizer_file
+      )
       @dim = dim
-      @description = description
-      @size_in_gb = size_in_gb
-      @sources = sources
-      @model_file = model_file
-      @tokenizer_file = tokenizer_file
       @pooling = pooling
       @normalize = normalize
-    end
-
-    def hf_repo
-      sources[:hf]
     end
 
     def to_h

@@ -3,8 +3,7 @@
 module Fastembed
   # Model information for reranker/cross-encoder models
   class RerankerModelInfo
-    attr_reader :model_name, :description, :size_in_gb, :model_file,
-                :tokenizer_file, :sources
+    include BaseModelInfo
 
     def initialize(
       model_name:,
@@ -14,16 +13,14 @@ module Fastembed
       model_file: 'onnx/model.onnx',
       tokenizer_file: 'tokenizer.json'
     )
-      @model_name = model_name
-      @description = description
-      @size_in_gb = size_in_gb
-      @sources = sources
-      @model_file = model_file
-      @tokenizer_file = tokenizer_file
-    end
-
-    def hf_repo
-      sources[:hf]
+      initialize_base(
+        model_name: model_name,
+        description: description,
+        size_in_gb: size_in_gb,
+        sources: sources,
+        model_file: model_file,
+        tokenizer_file: tokenizer_file
+      )
     end
 
     def to_h

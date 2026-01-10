@@ -7,6 +7,7 @@ module Fastembed
   class DownloadError < Error; end
 end
 
+require_relative 'fastembed/base_model_info'
 require_relative 'fastembed/model_info'
 require_relative 'fastembed/reranker_model_info'
 require_relative 'fastembed/model_management'
