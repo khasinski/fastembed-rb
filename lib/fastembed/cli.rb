@@ -14,6 +14,7 @@ module Fastembed
       @options = {
         format: 'json',
         model: 'BAAI/bge-small-en-v1.5',
+        sparse_model: 'prithivida/Splade_PP_en_v1',
         reranker_model: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
         batch_size: 256,
         top_k: nil
@@ -28,8 +29,12 @@ module Fastembed
         list_models
       when 'list-rerankers', 'rerankers'
         list_rerankers
+      when 'list-sparse'
+        list_sparse
       when 'embed'
         embed
+      when 'sparse-embed'
+        sparse_embed
       when 'rerank'
         rerank
       when 'cache'
@@ -75,9 +80,11 @@ module Fastembed
         Usage: fastembed <command> [options]
 
         Commands:
-          embed           Generate embeddings for text
+          embed           Generate dense embeddings for text
+          sparse-embed    Generate sparse (SPLADE) embeddings for text
           rerank          Rerank documents by relevance to a query
-          list-models     List available embedding models
+          list-models     List available dense embedding models
+          list-sparse     List available sparse embedding models
           list-rerankers  List available reranker models
           cache           Manage model cache (clear, info)
           version         Show version
@@ -102,6 +109,17 @@ module Fastembed
       puts 'Available reranker models:'
       puts
       Fastembed::SUPPORTED_RERANKER_MODELS.each_value do |model|
+        puts "  #{model.model_name}"
+        puts "    Size: #{model.size_in_gb} GB"
+        puts "    Description: #{model.description}"
+        puts
+      end
+    end
+
+    def list_sparse
+      puts 'Available sparse embedding models:'
+      puts
+      Fastembed::SUPPORTED_SPARSE_MODELS.each_value do |model|
         puts "  #{model.model_name}"
         puts "    Size: #{model.size_in_gb} GB"
         puts "    Description: #{model.description}"
@@ -145,6 +163,66 @@ module Fastembed
           exit 0
         end
       end.parse!(@argv)
+    end
+
+    def sparse_embed
+      parse_sparse_embed_options
+      texts = gather_texts
+
+      if texts.empty?
+        warn 'Error: No text provided. Pass text as arguments or pipe through stdin.'
+        exit 1
+      end
+
+      embedding = Fastembed::TextSparseEmbedding.new(model_name: @options[:sparse_model])
+      sparse_embeddings = embedding.embed(texts, batch_size: @options[:batch_size]).to_a
+
+      output_sparse_embeddings(texts, sparse_embeddings)
+    end
+
+    def parse_sparse_embed_options
+      OptionParser.new do |opts|
+        opts.banner = 'Usage: fastembed sparse-embed [options] [text ...]'
+
+        opts.on('-m', '--model MODEL', 'Model to use (default: prithivida/Splade_PP_en_v1)') do |m|
+          @options[:sparse_model] = m
+        end
+
+        opts.on('-f', '--format FORMAT', %w[json ndjson], 'Output format: json, ndjson (default: json)') do |f|
+          @options[:format] = f
+        end
+
+        opts.on('-b', '--batch-size SIZE', Integer, 'Batch size (default: 256)') do |b|
+          @options[:batch_size] = b
+        end
+
+        opts.on('-h', '--help', 'Show help') do
+          puts opts
+          exit 0
+        end
+      end.parse!(@argv)
+    end
+
+    def output_sparse_embeddings(texts, embeddings)
+      case @options[:format]
+      when 'json'
+        output_sparse_json(texts, embeddings)
+      when 'ndjson'
+        output_sparse_ndjson(texts, embeddings)
+      end
+    end
+
+    def output_sparse_json(texts, embeddings)
+      result = texts.zip(embeddings).map do |text, emb|
+        { text: text, indices: emb.indices, values: emb.values }
+      end
+      puts JSON.pretty_generate(result)
+    end
+
+    def output_sparse_ndjson(texts, embeddings)
+      texts.zip(embeddings).each do |text, emb|
+        puts JSON.generate({ text: text, indices: emb.indices, values: emb.values })
+      end
     end
 
     def gather_texts

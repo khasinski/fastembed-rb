@@ -71,6 +71,23 @@ RSpec.describe Fastembed::CLI do
     end
   end
 
+  describe 'list-sparse command' do
+    it 'lists all supported sparse models' do
+      cli = described_class.new(['list-sparse'])
+      expect { cli.run }.to output(%r{prithivida/Splade_PP_en_v1}).to_stdout
+    end
+
+    it 'shows model size' do
+      cli = described_class.new(['list-sparse'])
+      expect { cli.run }.to output(/Size:.*GB/).to_stdout
+    end
+
+    it 'shows model descriptions' do
+      cli = described_class.new(['list-sparse'])
+      expect { cli.run }.to output(/Description:/).to_stdout
+    end
+  end
+
   describe 'embed command' do
     it 'embeds text from arguments' do
       cli = described_class.new(['embed', 'hello world'])
