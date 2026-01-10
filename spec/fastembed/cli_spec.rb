@@ -103,6 +103,55 @@ RSpec.describe Fastembed::CLI do
     end
   end
 
+  describe 'rerank command' do
+    it 'reranks documents against a query' do
+      cli = described_class.new(['rerank', '-q', 'What is Ruby?', 'Ruby is a programming language', 'The sky is blue'])
+      output = capture_stdout { cli.run }
+      result = JSON.parse(output)
+
+      expect(result).to be_an(Array)
+      expect(result.length).to eq(2)
+      expect(result.first).to have_key('document')
+      expect(result.first).to have_key('score')
+      expect(result.first).to have_key('index')
+      # Most relevant document should be first (about Ruby)
+      expect(result.first['document']).to include('Ruby')
+    end
+
+    it 'returns top-k results' do
+      cli = described_class.new(['rerank', '-q', 'programming', '-k', '1', 'Python', 'Java', 'cooking'])
+      output = capture_stdout { cli.run }
+      result = JSON.parse(output)
+
+      expect(result.length).to eq(1)
+    end
+
+    it 'outputs ndjson format' do
+      cli = described_class.new(['rerank', '-q', 'test', '-f', 'ndjson', 'doc1', 'doc2'])
+      output = capture_stdout { cli.run }
+      lines = output.strip.split("\n")
+
+      expect(lines.length).to eq(2)
+      expect(JSON.parse(lines.first)).to have_key('document')
+    end
+
+    it 'shows help with --help' do
+      cli = described_class.new(['rerank', '--help'])
+      expect { cli.run }.to output(/Usage: fastembed rerank/).to_stdout.and raise_error(SystemExit)
+    end
+
+    it 'errors when no query provided' do
+      cli = described_class.new(['rerank', 'doc1', 'doc2'])
+      expect { cli.run }.to output(/Query is required/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'errors when no documents provided' do
+      cli = described_class.new(['rerank', '-q', 'test'])
+      allow($stdin).to receive(:tty?).and_return(true)
+      expect { cli.run }.to output(/No documents provided/).to_stderr.and raise_error(SystemExit)
+    end
+  end
+
   describe 'unknown command' do
     it 'shows error for unknown command' do
       cli = described_class.new(['unknown'])

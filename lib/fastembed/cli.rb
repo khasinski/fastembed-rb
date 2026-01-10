@@ -11,7 +11,13 @@ module Fastembed
 
     def initialize(argv)
       @argv = argv
-      @options = { format: 'json', model: 'BAAI/bge-small-en-v1.5', batch_size: 256 }
+      @options = {
+        format: 'json',
+        model: 'BAAI/bge-small-en-v1.5',
+        reranker_model: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+        batch_size: 256,
+        top_k: nil
+      }
     end
 
     def run
@@ -22,6 +28,8 @@ module Fastembed
         list_models
       when 'embed'
         embed
+      when 'rerank'
+        rerank
       when 'version', '-v', '--version'
         puts "fastembed #{Fastembed::VERSION}"
       when 'help', nil
@@ -64,6 +72,7 @@ module Fastembed
 
         Commands:
           embed         Generate embeddings for text
+          rerank        Rerank documents by relevance to a query
           list-models   List available embedding models
           version       Show version
           help          Show this help message
@@ -158,6 +167,71 @@ module Fastembed
     def output_csv(embeddings)
       embeddings.each do |embedding|
         puts embedding.join(',')
+      end
+    end
+
+    def rerank
+      parse_rerank_options
+
+      if @options[:query].nil? || @options[:query].empty?
+        warn 'Error: Query is required. Use -q or --query to specify.'
+        exit 1
+      end
+
+      documents = gather_texts
+      if documents.empty?
+        warn 'Error: No documents provided. Pass documents as arguments or pipe through stdin.'
+        exit 1
+      end
+
+      reranker = Fastembed::TextCrossEncoder.new(model_name: @options[:reranker_model])
+      results = reranker.rerank_with_scores(
+        query: @options[:query],
+        documents: documents,
+        top_k: @options[:top_k],
+        batch_size: @options[:batch_size]
+      )
+
+      output_rerank_results(results)
+    end
+
+    def parse_rerank_options
+      OptionParser.new do |opts|
+        opts.banner = 'Usage: fastembed rerank -q QUERY [options] [documents ...]'
+
+        opts.on('-q', '--query QUERY', 'Query to rank documents against (required)') do |q|
+          @options[:query] = q
+        end
+
+        opts.on('-m', '--model MODEL', 'Reranker model (default: cross-encoder/ms-marco-MiniLM-L-6-v2)') do |m|
+          @options[:reranker_model] = m
+        end
+
+        opts.on('-k', '--top-k K', Integer, 'Return only top K results') do |k|
+          @options[:top_k] = k
+        end
+
+        opts.on('-f', '--format FORMAT', %w[json ndjson], 'Output format: json, ndjson (default: json)') do |f|
+          @options[:format] = f
+        end
+
+        opts.on('-b', '--batch-size SIZE', Integer, 'Batch size (default: 256)') do |b|
+          @options[:batch_size] = b
+        end
+
+        opts.on('-h', '--help', 'Show help') do
+          puts opts
+          exit 0
+        end
+      end.parse!(@argv)
+    end
+
+    def output_rerank_results(results)
+      case @options[:format]
+      when 'json'
+        puts JSON.pretty_generate(results)
+      when 'ndjson'
+        results.each { |r| puts JSON.generate(r) }
       end
     end
   end
