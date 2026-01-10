@@ -15,6 +15,13 @@ module Fastembed
   #     # Process each vector
   #   end
   #
+  # @example Load from local directory
+  #   embedding = Fastembed::TextEmbedding.new(
+  #     local_model_dir: "/path/to/model",
+  #     model_file: "model.onnx",
+  #     tokenizer_file: "tokenizer.json"
+  #   )
+  #
   class TextEmbedding
     include BaseModel
 
@@ -28,22 +35,40 @@ module Fastembed
     # @param providers [Array<String>, nil] ONNX execution providers (e.g., ["CoreMLExecutionProvider"])
     # @param show_progress [Boolean] Whether to show download progress
     # @param quantization [Symbol] Quantization type (:fp32, :fp16, :int8, :uint8, :q4)
+    # @param local_model_dir [String, nil] Load model from local directory instead of downloading
+    # @param model_file [String, nil] Override model file name (e.g., "model.onnx")
+    # @param tokenizer_file [String, nil] Override tokenizer file name (e.g., "tokenizer.json")
     def initialize(
       model_name: DEFAULT_MODEL,
       cache_dir: nil,
       threads: nil,
       providers: nil,
       show_progress: true,
-      quantization: nil
+      quantization: nil,
+      local_model_dir: nil,
+      model_file: nil,
+      tokenizer_file: nil
     )
-      initialize_model(
-        model_name: model_name,
-        cache_dir: cache_dir,
-        threads: threads,
-        providers: providers,
-        show_progress: show_progress,
-        quantization: quantization
-      )
+      if local_model_dir
+        initialize_from_local(
+          local_model_dir: local_model_dir,
+          model_name: model_name,
+          threads: threads,
+          providers: providers,
+          quantization: quantization,
+          model_file: model_file,
+          tokenizer_file: tokenizer_file
+        )
+      else
+        initialize_model(
+          model_name: model_name,
+          cache_dir: cache_dir,
+          threads: threads,
+          providers: providers,
+          show_progress: show_progress,
+          quantization: quantization
+        )
+      end
 
       @dim = @model_info.dim
       @model = OnnxEmbeddingModel.new(
@@ -51,7 +76,7 @@ module Fastembed
         @model_dir,
         threads: threads,
         providers: providers,
-        model_file_override: quantized_model_file
+        model_file_override: model_file || quantized_model_file
       )
     end
 
@@ -125,6 +150,59 @@ module Fastembed
 
     def resolve_model_info(model_name)
       ModelManagement.resolve_model_info(model_name)
+    end
+
+    def initialize_from_local(local_model_dir:, model_name:, threads:, providers:, quantization:, model_file:, tokenizer_file:)
+      raise ArgumentError, "Local model directory not found: #{local_model_dir}" unless Dir.exist?(local_model_dir)
+
+      @model_name = model_name
+      @threads = threads
+      @providers = providers
+      @quantization = quantization || Quantization::DEFAULT
+      @model_dir = local_model_dir
+
+      validate_quantization!
+
+      # Try to get model info from registry, or create a minimal one
+      @model_info = SUPPORTED_MODELS[model_name] || create_local_model_info(
+        model_name: model_name,
+        model_file: model_file,
+        tokenizer_file: tokenizer_file
+      )
+    end
+
+    def create_local_model_info(model_name:, model_file:, tokenizer_file:)
+      # Detect dimension from model output shape if possible
+      # For now, use a placeholder that will be updated after model load
+      ModelInfo.new(
+        model_name: model_name,
+        dim: detect_model_dimension(model_file) || 384,
+        description: 'Local model',
+        size_in_gb: 0,
+        sources: {},
+        model_file: model_file || 'model.onnx',
+        tokenizer_file: tokenizer_file || 'tokenizer.json'
+      )
+    end
+
+    def detect_model_dimension(model_file)
+      # Try to detect dimension from ONNX model metadata
+      model_path = File.join(@model_dir, model_file || 'model.onnx')
+      return nil unless File.exist?(model_path)
+
+      begin
+        session = OnnxRuntime::InferenceSession.new(model_path)
+        # Look for output shape - usually [batch, seq_len, hidden_size] or [batch, hidden_size]
+        output = session.outputs.first
+        return nil unless output && output[:shape]
+
+        shape = output[:shape]
+        # Last dimension is usually the embedding dimension
+        dim = shape.last
+        dim.is_a?(Integer) && dim > 0 ? dim : nil
+      rescue StandardError
+        nil
+      end
     end
   end
 end

@@ -208,4 +208,12 @@ RSpec.describe Fastembed::TextEmbedding do
       expect(info).to be_nil
     end
   end
+
+  describe 'local model loading' do
+    it 'raises error if local directory does not exist' do
+      expect do
+        described_class.new(local_model_dir: '/nonexistent/path')
+      end.to raise_error(ArgumentError, /Local model directory not found/)
+    end
+  end
 end
