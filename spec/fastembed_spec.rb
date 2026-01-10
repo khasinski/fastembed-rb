@@ -91,6 +91,49 @@ RSpec.describe Fastembed::Pooling do
   end
 end
 
+RSpec.describe Fastembed::RerankerModelInfo do
+  describe 'SUPPORTED_RERANKER_MODELS' do
+    it 'contains the default reranker model' do
+      expect(Fastembed::SUPPORTED_RERANKER_MODELS).to have_key(Fastembed::DEFAULT_RERANKER_MODEL)
+    end
+
+    it 'has HuggingFace source for all models' do
+      Fastembed::SUPPORTED_RERANKER_MODELS.each do |name, info|
+        expect(info.hf_repo).not_to be_nil, "Model #{name} missing HF repo"
+      end
+    end
+
+    it 'has required attributes for all models' do
+      Fastembed::SUPPORTED_RERANKER_MODELS.each_value do |info|
+        expect(info.model_name).to be_a(String)
+        expect(info.description).to be_a(String)
+        expect(info.size_in_gb).to be_a(Numeric)
+        expect(info.model_file).to be_a(String)
+        expect(info.tokenizer_file).to be_a(String)
+      end
+    end
+  end
+
+  describe '#to_h' do
+    it 'converts model info to hash' do
+      model = Fastembed::SUPPORTED_RERANKER_MODELS['cross-encoder/ms-marco-MiniLM-L-6-v2']
+      hash = model.to_h
+
+      expect(hash[:model_name]).to eq('cross-encoder/ms-marco-MiniLM-L-6-v2')
+      expect(hash).to have_key(:description)
+      expect(hash).to have_key(:size_in_gb)
+      expect(hash).to have_key(:sources)
+    end
+  end
+
+  describe '#hf_repo' do
+    it 'returns the HuggingFace repository' do
+      model = Fastembed::SUPPORTED_RERANKER_MODELS['BAAI/bge-reranker-base']
+      expect(model.hf_repo).to eq('Xenova/bge-reranker-base')
+    end
+  end
+end
+
 RSpec.describe Fastembed::ModelManagement do
   describe '.cache_dir' do
     it 'returns a path' do
