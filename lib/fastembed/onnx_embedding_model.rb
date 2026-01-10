@@ -8,11 +8,17 @@ module Fastembed
   class OnnxEmbeddingModel
     attr_reader :model_info, :model_dir
 
-    def initialize(model_info, model_dir, threads: nil, providers: nil)
+    # @param model_info [ModelInfo] Model metadata
+    # @param model_dir [String] Directory containing model files
+    # @param threads [Integer, nil] Number of threads for ONNX Runtime
+    # @param providers [Array<String>, nil] ONNX execution providers
+    # @param model_file_override [String, nil] Override model file path (for quantized models)
+    def initialize(model_info, model_dir, threads: nil, providers: nil, model_file_override: nil)
       @model_info = model_info
       @model_dir = model_dir
       @threads = threads
       @providers = providers
+      @model_file = model_file_override || model_info.model_file
 
       load_model
       load_tokenizer
@@ -38,7 +44,7 @@ module Fastembed
     private
 
     def load_model
-      model_path = File.join(model_dir, model_info.model_file)
+      model_path = File.join(model_dir, @model_file)
       raise Error, "Model file not found: #{model_path}" unless File.exist?(model_path)
 
       session_options = {}

@@ -6,20 +6,41 @@ require 'tokenizers'
 module Fastembed
   # Shared functionality for model classes
   module BaseModel
-    attr_reader :model_name, :model_info
+    attr_reader :model_name, :model_info, :quantization
 
     private
 
     # Common initialization logic for all model types
-    def initialize_model(model_name:, cache_dir:, threads:, providers:, show_progress:)
+    # @param model_name [String] Name of the model
+    # @param cache_dir [String, nil] Custom cache directory
+    # @param threads [Integer, nil] Number of threads for ONNX Runtime
+    # @param providers [Array<String>, nil] ONNX execution providers
+    # @param show_progress [Boolean] Whether to show download progress
+    # @param quantization [Symbol] Quantization type (:fp32, :fp16, :int8, :uint8, :q4)
+    def initialize_model(model_name:, cache_dir:, threads:, providers:, show_progress:, quantization: nil)
       @model_name = model_name
       @threads = threads
       @providers = providers
+      @quantization = quantization || Quantization::DEFAULT
+
+      validate_quantization!
 
       ModelManagement.cache_dir = cache_dir if cache_dir
 
       @model_info = resolve_model_info(model_name)
       @model_dir = retrieve_model(model_name, show_progress: show_progress)
+    end
+
+    def validate_quantization!
+      return if Quantization.valid?(@quantization)
+
+      valid_types = Quantization::TYPES.keys.join(', ')
+      raise ArgumentError, "Invalid quantization type: #{@quantization}. Valid types: #{valid_types}"
+    end
+
+    # Get the model file path, accounting for quantization
+    def quantized_model_file
+      Quantization.model_file(@model_info.model_file, @quantization)
     end
 
     # Override in subclasses to resolve from appropriate registry

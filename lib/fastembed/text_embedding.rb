@@ -27,23 +27,32 @@ module Fastembed
     # @param threads [Integer, nil] Number of threads for ONNX Runtime
     # @param providers [Array<String>, nil] ONNX execution providers (e.g., ["CoreMLExecutionProvider"])
     # @param show_progress [Boolean] Whether to show download progress
+    # @param quantization [Symbol] Quantization type (:fp32, :fp16, :int8, :uint8, :q4)
     def initialize(
       model_name: DEFAULT_MODEL,
       cache_dir: nil,
       threads: nil,
       providers: nil,
-      show_progress: true
+      show_progress: true,
+      quantization: nil
     )
       initialize_model(
         model_name: model_name,
         cache_dir: cache_dir,
         threads: threads,
         providers: providers,
-        show_progress: show_progress
+        show_progress: show_progress,
+        quantization: quantization
       )
 
       @dim = @model_info.dim
-      @model = OnnxEmbeddingModel.new(@model_info, @model_dir, threads: threads, providers: providers)
+      @model = OnnxEmbeddingModel.new(
+        @model_info,
+        @model_dir,
+        threads: threads,
+        providers: providers,
+        model_file_override: quantized_model_file
+      )
     end
 
     # Generate embeddings for documents
