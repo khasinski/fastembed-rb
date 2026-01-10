@@ -159,6 +159,115 @@ If we do a major version bump:
 2. Rename `query_embed`/`passage_embed` to `embed_query`/`embed_passage` for consistency
 3. Use keyword arguments consistently throughout
 
+---
+
+## Refactoring Plan
+
+### Completed: Phase 1 - Extract Shared Helpers
+
+- [x] Create `Validators` module for document validation
+- [x] Extract `prepare_model_inputs` to BaseModel
+- [x] Extract `setup_model_and_tokenizer` to BaseModel
+- [x] Update all model classes to use shared helpers
+
+**Result:** Reduced ~60 lines of duplicated code across 4 model classes.
+
+---
+
+### Completed: Phase 2 - Add Missing Features (Medium Risk)
+
+Goal: Achieve API consistency across all model types.
+
+#### 2.1 Add `passage_embed` to TextSparseEmbedding ✅ IMPLEMENTED
+
+Added to TextSparseEmbedding.
+
+```ruby
+# lib/fastembed/sparse_embedding.rb
+def passage_embed(passages, batch_size: 32)
+  passages = [passages] if passages.is_a?(String)
+  embed(passages, batch_size: batch_size)
+end
+```
+
+#### 2.2 Add async methods to all embedding classes ✅ IMPLEMENTED
+
+Added async methods to all model classes:
+- TextSparseEmbedding: embed_async, query_embed_async, passage_embed_async
+- LateInteractionTextEmbedding: embed_async, query_embed_async, passage_embed_async
+- TextCrossEncoder: rerank_async, rerank_with_scores_async
+
+```ruby
+# Add to TextSparseEmbedding
+def embed_async(documents, batch_size: 32)
+  Async::Future.new { embed(documents, batch_size: batch_size).to_a }
+end
+
+def query_embed_async(queries, batch_size: 32)
+  Async::Future.new { query_embed(queries, batch_size: batch_size).to_a }
+end
+
+def passage_embed_async(passages, batch_size: 32)
+  Async::Future.new { passage_embed(passages, batch_size: batch_size).to_a }
+end
+
+# Add to TextCrossEncoder
+def rerank_async(query:, documents:, batch_size: 64)
+  Async::Future.new { rerank(query: query, documents: documents, batch_size: batch_size) }
+end
+```
+
+#### 2.3 Add progress callback support to all embedding classes ✅ IMPLEMENTED
+
+Added progress callback support to TextSparseEmbedding and LateInteractionTextEmbedding.
+
+#### 2.4 Add `show_progress` parameter to TextCrossEncoder ✅ IMPLEMENTED
+
+Made configurable (was hardcoded to true).
+
+---
+
+### Completed: Phase 3 - Unify Initialization (Higher Risk)
+
+Goal: Consistent initialization API across all model types.
+
+#### 3.1 Add quantization support to all models ✅ IMPLEMENTED
+
+Added quantization parameter to all model classes (TextSparseEmbedding, LateInteractionTextEmbedding, TextCrossEncoder).
+
+#### 3.2 Add local_model_dir support to all models ✅ IMPLEMENTED
+
+Added local_model_dir, model_file, and tokenizer_file parameters to all model classes. Shared logic extracted to BaseModel (initialize_from_local, create_local_model_info).
+
+#### 3.3 Document batch size rationale ✅ DOCUMENTED
+
+Default batch sizes vary by model type based on memory requirements:
+
+| Model Type | Default Batch Size | Rationale |
+|------------|-------------------|-----------|
+| TextEmbedding | 256 | Dense embeddings have fixed output size (e.g., 384 floats). Memory is predictable and efficient. |
+| TextSparseEmbedding | 32 | SPLADE models output logits for entire vocabulary (~30k tokens) per sequence position. Much higher memory per document. |
+| LateInteractionTextEmbedding | 32 | ColBERT keeps per-token embeddings (not pooled), so output size scales with sequence length × embedding dim. |
+| TextCrossEncoder | 64 | Processes query-document pairs together. Each pair requires more memory than single documents, but less than sparse/late interaction. |
+
+Users can override these defaults via the `batch_size` parameter if they have different memory constraints.
+
+---
+
+### Implementation Priority
+
+| Task | Risk | Effort | Value |
+|------|------|--------|-------|
+| 2.1 Add passage_embed to Sparse | Low | Small | Medium |
+| 2.2 Add async to all classes | Low | Medium | High |
+| 2.3 Add progress to all classes | Medium | Medium | Medium |
+| 2.4 Add show_progress to CrossEncoder | Low | Small | Low |
+| 3.1 Add quantization to all | Medium | Medium | Medium |
+| 3.2 Add local_model_dir to all | Medium | Large | Medium |
+| 3.3 Document batch size rationale | Low | Small | Low |
+
+---
+
 ## Contributing
 
 Contributions are welcome! If you'd like to implement any of these features:

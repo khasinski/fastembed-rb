@@ -175,5 +175,58 @@ module Fastembed
       inputs = prepare_model_inputs(encodings)
       { inputs: inputs, attention_mask: encodings.map(&:attention_mask) }
     end
+
+    # Initialize model from local directory instead of downloading
+    #
+    # @param local_model_dir [String] Path to local model directory
+    # @param model_name [String] Name identifier for the model
+    # @param threads [Integer, nil] Number of threads for ONNX Runtime
+    # @param providers [Array<String>, nil] ONNX execution providers
+    # @param quantization [Symbol, nil] Quantization type
+    # @param model_file [String, nil] Override model file name
+    # @param tokenizer_file [String, nil] Override tokenizer file name
+    # @raise [ArgumentError] If local_model_dir doesn't exist
+    def initialize_from_local(local_model_dir:, model_name:, threads:, providers:, quantization:, model_file:,
+                              tokenizer_file:)
+      raise ArgumentError, "Local model directory not found: #{local_model_dir}" unless Dir.exist?(local_model_dir)
+
+      @model_name = model_name
+      @threads = threads
+      @providers = providers
+      @quantization = quantization || Quantization::DEFAULT
+      @model_dir = local_model_dir
+
+      validate_quantization!
+
+      # Try to get model info from registry, or create a minimal one
+      # Subclasses should override create_local_model_info
+      @model_info = resolve_model_info_safe(model_name) || create_local_model_info(
+        model_name: model_name,
+        model_file: model_file,
+        tokenizer_file: tokenizer_file
+      )
+    end
+
+    # Safely try to resolve model info, returning nil if not found
+    #
+    # @param model_name [String] Model name to look up
+    # @return [BaseModelInfo, nil] Model info or nil
+    def resolve_model_info_safe(model_name)
+      resolve_model_info(model_name)
+    rescue StandardError
+      nil
+    end
+
+    # Create model info for locally loaded model
+    # Subclasses should override this to create appropriate model info type
+    #
+    # @param model_name [String] Model name identifier
+    # @param model_file [String, nil] Model file path
+    # @param tokenizer_file [String, nil] Tokenizer file path
+    # @return [BaseModelInfo] Model info object
+    # @abstract
+    def create_local_model_info(model_name:, model_file:, tokenizer_file:)
+      raise NotImplementedError, 'Subclasses must implement create_local_model_info for local model loading'
+    end
   end
 end

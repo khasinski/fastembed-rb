@@ -76,38 +76,67 @@ module Fastembed
     # @param threads [Integer, nil] Number of threads for ONNX Runtime
     # @param providers [Array<String>, nil] ONNX execution providers
     # @param show_progress [Boolean] Whether to show download progress
+    # @param quantization [Symbol] Quantization type (:fp32, :fp16, :int8, :uint8, :q4)
+    # @param local_model_dir [String, nil] Load model from local directory instead of downloading
+    # @param model_file [String, nil] Override model file name (e.g., "model.onnx")
+    # @param tokenizer_file [String, nil] Override tokenizer file name (e.g., "tokenizer.json")
     def initialize(
       model_name: DEFAULT_LATE_INTERACTION_MODEL,
       cache_dir: nil,
       threads: nil,
       providers: nil,
-      show_progress: true
+      show_progress: true,
+      quantization: nil,
+      local_model_dir: nil,
+      model_file: nil,
+      tokenizer_file: nil
     )
-      initialize_model(
-        model_name: model_name,
-        cache_dir: cache_dir,
-        threads: threads,
-        providers: providers,
-        show_progress: show_progress
-      )
+      if local_model_dir
+        initialize_from_local(
+          local_model_dir: local_model_dir,
+          model_name: model_name,
+          threads: threads,
+          providers: providers,
+          quantization: quantization,
+          model_file: model_file,
+          tokenizer_file: tokenizer_file
+        )
+      else
+        initialize_model(
+          model_name: model_name,
+          cache_dir: cache_dir,
+          threads: threads,
+          providers: providers,
+          show_progress: show_progress,
+          quantization: quantization
+        )
+      end
 
       @dim = @model_info.dim
-      setup_model_and_tokenizer
+      setup_model_and_tokenizer(model_file_override: model_file || quantized_model_file)
     end
 
     # Generate late interaction embeddings for documents
     #
     # @param documents [Array<String>, String] Text document(s) to embed
     # @param batch_size [Integer] Number of documents to process at once
+    # @yield [Progress] Optional progress callback called after each batch
     # @return [Enumerator] Lazy enumerator yielding LateInteractionEmbedding objects
-    def embed(documents, batch_size: 32)
+    def embed(documents, batch_size: 32, &progress_callback)
       documents = Validators.validate_documents!(documents)
       return Enumerator.new { |_| } if documents.empty?
 
+      total_batches = (documents.length.to_f / batch_size).ceil
+
       Enumerator.new do |yielder|
-        documents.each_slice(batch_size) do |batch|
+        documents.each_slice(batch_size).with_index(1) do |batch, batch_num|
           embeddings = compute_embeddings(batch)
           embeddings.each { |emb| yielder << emb }
+
+          if progress_callback
+            progress = Progress.new(current: batch_num, total: total_batches, batch_size: batch_size)
+            progress_callback.call(progress)
+          end
         end
       end
     end
@@ -137,6 +166,33 @@ module Fastembed
       embed(prefixed, batch_size: batch_size)
     end
 
+    # Generate embeddings asynchronously
+    #
+    # @param documents [Array<String>, String] Text document(s) to embed
+    # @param batch_size [Integer] Number of documents to process at once
+    # @return [Async::Future] Future that resolves to array of LateInteractionEmbedding objects
+    def embed_async(documents, batch_size: 32)
+      Async::Future.new { embed(documents, batch_size: batch_size).to_a }
+    end
+
+    # Generate query embeddings asynchronously
+    #
+    # @param queries [Array<String>, String] Query text(s) to embed
+    # @param batch_size [Integer] Number of queries to process at once
+    # @return [Async::Future] Future that resolves to array of LateInteractionEmbedding objects
+    def query_embed_async(queries, batch_size: 32)
+      Async::Future.new { query_embed(queries, batch_size: batch_size).to_a }
+    end
+
+    # Generate passage embeddings asynchronously
+    #
+    # @param passages [Array<String>, String] Passage text(s) to embed
+    # @param batch_size [Integer] Number of passages to process at once
+    # @return [Async::Future] Future that resolves to array of LateInteractionEmbedding objects
+    def passage_embed_async(passages, batch_size: 32)
+      Async::Future.new { passage_embed(passages, batch_size: batch_size).to_a }
+    end
+
     # List all supported late interaction models
     #
     # @return [Array<Hash>] Array of model information hashes
@@ -151,6 +207,18 @@ module Fastembed
       raise Error, "Unknown late interaction model: #{model_name}" unless info
 
       info
+    end
+
+    def create_local_model_info(model_name:, model_file:, tokenizer_file:)
+      LateInteractionModelInfo.new(
+        model_name: model_name,
+        description: 'Local late interaction model',
+        size_in_gb: 0,
+        sources: {},
+        model_file: model_file || 'model.onnx',
+        tokenizer_file: tokenizer_file || 'tokenizer.json',
+        dim: 128 # Default ColBERT dimension
+      )
     end
 
     def compute_embeddings(texts)

@@ -31,21 +31,44 @@ module Fastembed
     # @param cache_dir [String, nil] Custom cache directory for models
     # @param threads [Integer, nil] Number of threads for ONNX Runtime
     # @param providers [Array<String>, nil] ONNX execution providers
+    # @param show_progress [Boolean] Whether to show download progress
+    # @param quantization [Symbol] Quantization type (:fp32, :fp16, :int8, :uint8, :q4)
+    # @param local_model_dir [String, nil] Load model from local directory instead of downloading
+    # @param model_file [String, nil] Override model file name (e.g., "model.onnx")
+    # @param tokenizer_file [String, nil] Override tokenizer file name (e.g., "tokenizer.json")
     def initialize(
       model_name: DEFAULT_RERANKER_MODEL,
       cache_dir: nil,
       threads: nil,
-      providers: nil
+      providers: nil,
+      show_progress: true,
+      quantization: nil,
+      local_model_dir: nil,
+      model_file: nil,
+      tokenizer_file: nil
     )
-      initialize_model(
-        model_name: model_name,
-        cache_dir: cache_dir,
-        threads: threads,
-        providers: providers,
-        show_progress: true
-      )
+      if local_model_dir
+        initialize_from_local(
+          local_model_dir: local_model_dir,
+          model_name: model_name,
+          threads: threads,
+          providers: providers,
+          quantization: quantization,
+          model_file: model_file,
+          tokenizer_file: tokenizer_file
+        )
+      else
+        initialize_model(
+          model_name: model_name,
+          cache_dir: cache_dir,
+          threads: threads,
+          providers: providers,
+          show_progress: show_progress,
+          quantization: quantization
+        )
+      end
 
-      setup_model_and_tokenizer
+      setup_model_and_tokenizer(model_file_override: model_file || quantized_model_file)
     end
 
     # Score query-document pairs and return relevance scores
@@ -85,6 +108,27 @@ module Fastembed
       top_k ? results.first(top_k) : results
     end
 
+    # Rerank documents asynchronously
+    #
+    # @param query [String] The query text
+    # @param documents [Array<String>] Documents to score against the query
+    # @param batch_size [Integer] Number of pairs to process at once
+    # @return [Async::Future] Future that resolves to array of scores
+    def rerank_async(query:, documents:, batch_size: 64)
+      Async::Future.new { rerank(query: query, documents: documents, batch_size: batch_size) }
+    end
+
+    # Rerank documents with scores asynchronously
+    #
+    # @param query [String] The query text
+    # @param documents [Array<String>] Documents to rerank
+    # @param top_k [Integer, nil] Return only top K results (nil = all)
+    # @param batch_size [Integer] Number of pairs to process at once
+    # @return [Async::Future] Future that resolves to sorted results array
+    def rerank_with_scores_async(query:, documents:, top_k: nil, batch_size: 64)
+      Async::Future.new { rerank_with_scores(query: query, documents: documents, top_k: top_k, batch_size: batch_size) }
+    end
+
     # List all supported reranker models
     #
     # @return [Array<Hash>] Array of model information hashes
@@ -99,6 +143,17 @@ module Fastembed
       raise Error, "Unknown reranker model: #{model_name}" unless info
 
       info
+    end
+
+    def create_local_model_info(model_name:, model_file:, tokenizer_file:)
+      RerankerModelInfo.new(
+        model_name: model_name,
+        description: 'Local reranker model',
+        size_in_gb: 0,
+        sources: {},
+        model_file: model_file || 'model.onnx',
+        tokenizer_file: tokenizer_file || 'tokenizer.json'
+      )
     end
 
     def score_pairs(query, documents)
