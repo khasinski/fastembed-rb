@@ -23,7 +23,7 @@ module Fastembed
   #   # => [{document: "Ruby is a programming...", score: 0.89, index: 2}, ...]
   #
   class TextCrossEncoder
-    attr_reader :model_name, :model_info
+    include BaseModel
 
     # Initialize a cross-encoder model for reranking
     #
@@ -37,16 +37,11 @@ module Fastembed
       threads: nil,
       providers: nil
     )
-      @model_name = model_name
-      @threads = threads
-      @providers = providers
-
-      ModelManagement.cache_dir = cache_dir if cache_dir
-
-      @model_info = resolve_model_info(model_name)
-      @model_dir = ModelManagement.retrieve_model(
-        model_name,
-        model_info: @model_info,
+      initialize_model(
+        model_name: model_name,
+        cache_dir: cache_dir,
+        threads: threads,
+        providers: providers,
         show_progress: true
       )
 
@@ -115,26 +110,12 @@ module Fastembed
 
     def load_model
       model_path = File.join(@model_dir, @model_info.model_file)
-      raise Error, "Model file not found: #{model_path}" unless File.exist?(model_path)
-
-      session_options = {}
-      session_options[:inter_op_num_threads] = @threads if @threads
-      session_options[:intra_op_num_threads] = @threads if @threads
-
-      @session = OnnxRuntime::InferenceSession.new(
-        model_path,
-        **session_options,
-        providers: @providers || ['CPUExecutionProvider']
-      )
+      @session = load_onnx_session(model_path, providers: @providers)
     end
 
     def load_tokenizer
       tokenizer_path = File.join(@model_dir, @model_info.tokenizer_file)
-      raise Error, "Tokenizer not found: #{tokenizer_path}" unless File.exist?(tokenizer_path)
-
-      @tokenizer = Tokenizers::Tokenizer.from_file(tokenizer_path)
-      @tokenizer.enable_truncation(@model_info.max_length)
-      @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
+      @tokenizer = load_tokenizer_from_file(tokenizer_path, max_length: @model_info.max_length)
     end
 
     def score_pairs(query, documents)

@@ -16,7 +16,9 @@ module Fastembed
   #   end
   #
   class TextEmbedding
-    attr_reader :model_name, :model_info, :dim
+    include BaseModel
+
+    attr_reader :dim
 
     # Initialize a text embedding model
     #
@@ -32,20 +34,15 @@ module Fastembed
       providers: nil,
       show_progress: true
     )
-      @model_name = model_name
-      @threads = threads
-      @providers = providers
-      @show_progress = show_progress
+      initialize_model(
+        model_name: model_name,
+        cache_dir: cache_dir,
+        threads: threads,
+        providers: providers,
+        show_progress: show_progress
+      )
 
-      # Set custom cache directory if provided
-      ModelManagement.cache_dir = cache_dir if cache_dir
-
-      # Resolve model info
-      @model_info = ModelManagement.resolve_model_info(model_name)
       @dim = @model_info.dim
-
-      # Download and load model
-      @model_dir = ModelManagement.retrieve_model(model_name, show_progress: show_progress)
       @model = OnnxEmbeddingModel.new(@model_info, @model_dir, threads: threads, providers: providers)
     end
 
@@ -113,6 +110,12 @@ module Fastembed
     # @return [Hash, nil] Model information or nil if not found
     def self.get_model_info(model_name)
       SUPPORTED_MODELS[model_name]&.to_h
+    end
+
+    private
+
+    def resolve_model_info(model_name)
+      ModelManagement.resolve_model_info(model_name)
     end
   end
 end
