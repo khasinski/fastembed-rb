@@ -137,17 +137,33 @@ result = Benchmark.measure { embedding.embed(texts).to_a }
 puts "#{1000 / result.real} docs/sec"
 ```
 
+## Reranker Performance
+
+TextCrossEncoder (cross-encoder) performance using ms-marco-MiniLM-L-6-v2:
+
+| Documents | Throughput | Latency |
+|-----------|------------|---------|
+| 10 docs | ~450 docs/sec | ~22ms |
+| 50 docs | ~380 docs/sec | ~130ms |
+| 100 docs | ~350 docs/sec | ~285ms |
+
+Cross-encoders are slower than embedding models because they process query-document pairs together rather than encoding them independently.
+
 ### Profiling Scripts
 
 The `benchmark/` directory contains:
 
-- `profile.rb` - Comprehensive performance profiling
+- `profile.rb` - Comprehensive embedding performance profiling
+- `reranker_benchmark.rb` - Reranker/cross-encoder performance
 - `memory_profile.rb` - Memory usage analysis
 - `compare_python.py` - Python FastEmbed comparison
+- `compare_all.rb` - Unified Ruby vs Python comparison
 
 Run with:
 ```bash
 ruby benchmark/profile.rb
+ruby benchmark/reranker_benchmark.rb
 ruby benchmark/memory_profile.rb
+ruby benchmark/compare_all.rb
 python3 benchmark/compare_python.py
 ```
