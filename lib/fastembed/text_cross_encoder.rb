@@ -60,8 +60,16 @@ module Fastembed
     # @param documents [Array<String>] Documents to score against the query
     # @param batch_size [Integer] Number of pairs to process at once
     # @return [Array<Float>] Relevance scores for each document (higher = more relevant)
+    # @raise [ArgumentError] If query or documents is nil, or documents contains nil
     def rerank(query:, documents:, batch_size: 64)
+      raise ArgumentError, 'query cannot be nil' if query.nil?
+      raise ArgumentError, 'documents cannot be nil' if documents.nil?
+
       return [] if documents.empty?
+
+      documents.each_with_index do |doc, i|
+        raise ArgumentError, "document at index #{i} cannot be nil" if doc.nil?
+      end
 
       scores = []
       documents.each_slice(batch_size) do |batch|
@@ -125,6 +133,8 @@ module Fastembed
       raise Error, "Tokenizer not found: #{tokenizer_path}" unless File.exist?(tokenizer_path)
 
       @tokenizer = Tokenizers::Tokenizer.from_file(tokenizer_path)
+      @tokenizer.enable_truncation(512)
+      @tokenizer.enable_padding(pad_id: 0, pad_token: '[PAD]')
     end
 
     def score_pairs(query, documents)

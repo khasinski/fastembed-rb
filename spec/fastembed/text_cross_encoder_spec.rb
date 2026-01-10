@@ -122,5 +122,59 @@ RSpec.describe Fastembed::TextCrossEncoder do
         expect(results.length).to eq(3)
       end
     end
+
+    describe 'edge cases' do
+      it 'raises error for nil query' do
+        expect do
+          reranker.rerank(query: nil, documents: ['doc'])
+        end.to raise_error(ArgumentError, /query cannot be nil/)
+      end
+
+      it 'raises error for nil documents' do
+        expect do
+          reranker.rerank(query: 'test', documents: nil)
+        end.to raise_error(ArgumentError, /documents cannot be nil/)
+      end
+
+      it 'raises error for nil in documents array' do
+        expect do
+          reranker.rerank(query: 'test', documents: ['doc1', nil, 'doc2'])
+        end.to raise_error(ArgumentError, /document at index 1 cannot be nil/)
+      end
+
+      it 'handles empty query string' do
+        scores = reranker.rerank(query: '', documents: ['some document'])
+        expect(scores.length).to eq(1)
+        expect(scores.first).to be_a(Float)
+      end
+
+      it 'handles whitespace-only query' do
+        scores = reranker.rerank(query: '   ', documents: ['some document'])
+        expect(scores.length).to eq(1)
+      end
+
+      it 'handles unicode in query and documents' do
+        scores = reranker.rerank(
+          query: 'What is 世界?',
+          documents: ['世界 means world in Chinese', 'Hello 🌍']
+        )
+        expect(scores.length).to eq(2)
+        expect(scores).to all(be_a(Float))
+      end
+
+      it 'handles very long documents by truncating' do
+        long_doc = 'word ' * 1000
+        scores = reranker.rerank(query: 'test', documents: [long_doc])
+        expect(scores.length).to eq(1)
+        expect(scores.first).to be_a(Float)
+      end
+
+      it 'generates consistent scores' do
+        docs = ['Machine learning is AI', 'Weather is nice']
+        scores1 = reranker.rerank(query: 'What is ML?', documents: docs)
+        scores2 = reranker.rerank(query: 'What is ML?', documents: docs)
+        expect(scores1).to eq(scores2)
+      end
+    end
   end
 end
