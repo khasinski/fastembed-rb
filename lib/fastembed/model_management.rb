@@ -6,9 +6,24 @@ require 'json'
 require 'fileutils'
 
 module Fastembed
-  # Handles model downloading and caching
+  # Handles model downloading and caching from HuggingFace
+  #
+  # Downloads ONNX models and tokenizer files from HuggingFace repositories,
+  # caching them locally for subsequent use. Supports custom cache directories
+  # via environment variables.
+  #
+  # @example Check cache location
+  #   Fastembed::ModelManagement.cache_dir
+  #   # => "/home/user/.cache/fastembed"
+  #
+  # @example Use custom cache directory
+  #   Fastembed::ModelManagement.cache_dir = "/custom/path"
+  #
   module ModelManagement
+    # Base URL for HuggingFace API
     HF_API_BASE = 'https://huggingface.co'
+
+    # Files required for model operation (in addition to model.onnx and tokenizer.json)
     REQUIRED_FILES = %w[
       config.json
       tokenizer.json
@@ -18,7 +33,13 @@ module Fastembed
 
     class << self
       # Returns the cache directory for storing models
-      # Priority: FASTEMBED_CACHE_PATH > XDG_CACHE_HOME > ~/.cache
+      #
+      # Priority order:
+      # 1. FASTEMBED_CACHE_PATH environment variable
+      # 2. XDG_CACHE_HOME environment variable
+      # 3. ~/.cache (fallback)
+      #
+      # @return [String] Absolute path to cache directory
       def cache_dir
         @cache_dir ||= begin
           base = ENV['FASTEMBED_CACHE_PATH'] ||
@@ -29,12 +50,20 @@ module Fastembed
       end
 
       # Set a custom cache directory
+      # @!attribute [w] cache_dir
+      # @return [String] Path to use as cache directory
       attr_writer :cache_dir
 
       # Returns the path to a cached model, downloading if necessary
-      # @param model_name [String] Name of the model
-      # @param model_info [ModelInfo, RerankerModelInfo, nil] Optional pre-resolved model info
-      # @param show_progress [Boolean] Whether to show download progress
+      #
+      # Downloads the model from HuggingFace if not already cached.
+      # The model directory will contain the ONNX model file and tokenizer.
+      #
+      # @param model_name [String] Name of the model (e.g., "BAAI/bge-small-en-v1.5")
+      # @param model_info [BaseModelInfo, nil] Optional pre-resolved model info
+      # @param show_progress [Boolean] Whether to print download progress
+      # @return [String] Absolute path to the model directory
+      # @raise [DownloadError] If the download fails
       def retrieve_model(model_name, model_info: nil, show_progress: true)
         model_info ||= resolve_model_info(model_name)
         model_dir = model_directory(model_info)
@@ -48,6 +77,10 @@ module Fastembed
       end
 
       # Check if a model exists in cache
+      #
+      # @param model_dir [String] Path to model directory
+      # @param model_info [BaseModelInfo] Model info with required file paths
+      # @return [Boolean] True if model files exist
       def model_cached?(model_dir, model_info)
         return false unless Dir.exist?(model_dir)
 
@@ -59,13 +92,20 @@ module Fastembed
       end
 
       # Get the directory path for a model
+      #
+      # @param model_info [BaseModelInfo] Model info
+      # @return [String] Path where model should be stored
       def model_directory(model_info)
         # Create a safe directory name from the model name
         safe_name = model_info.model_name.gsub('/', '--')
         File.join(cache_dir, 'models', safe_name)
       end
 
-      # Resolve model name to ModelInfo
+      # Resolve model name to ModelInfo from registry
+      #
+      # @param model_name [String] Model name to look up
+      # @return [ModelInfo] The model information
+      # @raise [ArgumentError] If model is not found in registry
       def resolve_model_info(model_name)
         model_info = SUPPORTED_MODELS[model_name]
         unless model_info

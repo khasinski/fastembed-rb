@@ -2,11 +2,31 @@
 
 module Fastembed
   # Model information for late interaction models (ColBERT, etc.)
+  #
+  # Late interaction models produce token-level embeddings instead of a single
+  # document vector, enabling fine-grained matching via MaxSim scoring.
+  #
+  # @example Access late interaction model info
+  #   info = Fastembed::SUPPORTED_LATE_INTERACTION_MODELS['colbert-ir/colbertv2.0']
+  #   info.dim  # => 128
+  #
   class LateInteractionModelInfo
     include BaseModelInfo
 
+    # @!attribute [r] dim
+    #   @return [Integer] Output embedding dimension per token
     attr_reader :dim
 
+    # Create a new LateInteractionModelInfo instance
+    #
+    # @param model_name [String] Full model identifier
+    # @param dim [Integer] Output embedding dimension per token
+    # @param description [String] Human-readable description
+    # @param size_in_gb [Float] Model size in GB
+    # @param sources [Hash] Source repositories
+    # @param model_file [String] Path to ONNX model file
+    # @param tokenizer_file [String] Path to tokenizer file
+    # @param max_length [Integer] Maximum sequence length
     def initialize(
       model_name:,
       dim:,
@@ -29,6 +49,8 @@ module Fastembed
       @dim = dim
     end
 
+    # Convert to hash representation
+    # @return [Hash] Model info as a hash
     def to_h
       {
         model_name: model_name,

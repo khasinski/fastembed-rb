@@ -5,7 +5,17 @@ require 'tokenizers'
 
 module Fastembed
   # ONNX-based embedding model wrapper
+  #
+  # Handles the low-level details of running ONNX inference and tokenization
+  # for embedding models. Used internally by TextEmbedding.
+  #
+  # @api private
+  #
   class OnnxEmbeddingModel
+    # @!attribute [r] model_info
+    #   @return [ModelInfo] Model metadata
+    # @!attribute [r] model_dir
+    #   @return [String] Path to model directory
     attr_reader :model_info, :model_dir
 
     # @param model_info [ModelInfo] Model metadata
@@ -25,6 +35,11 @@ module Fastembed
     end
 
     # Embed a batch of texts
+    #
+    # Tokenizes the input, runs ONNX inference, and applies pooling.
+    #
+    # @param texts [Array<String>] Texts to embed
+    # @return [Array<Array<Float>>] Embedding vectors
     def embed(texts)
       # Tokenize
       encoded = tokenize(texts)

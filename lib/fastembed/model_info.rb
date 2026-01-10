@@ -1,12 +1,40 @@
 # frozen_string_literal: true
 
 module Fastembed
-  # Model information for embedding models
+  # Model information for dense embedding models
+  #
+  # Stores metadata and configuration for ONNX embedding models including
+  # output dimensions, pooling strategy, and normalization settings.
+  #
+  # @example Access model info
+  #   info = Fastembed::SUPPORTED_MODELS['BAAI/bge-small-en-v1.5']
+  #   info.dim        # => 384
+  #   info.pooling    # => :mean
+  #   info.normalize  # => true
+  #
   class ModelInfo
     include BaseModelInfo
 
+    # @!attribute [r] dim
+    #   @return [Integer] Output embedding dimension
+    # @!attribute [r] pooling
+    #   @return [Symbol] Pooling strategy (:mean or :cls)
+    # @!attribute [r] normalize
+    #   @return [Boolean] Whether to L2 normalize output embeddings
     attr_reader :dim, :pooling, :normalize
 
+    # Create a new ModelInfo instance
+    #
+    # @param model_name [String] Full model identifier
+    # @param dim [Integer] Output embedding dimension
+    # @param description [String] Human-readable description
+    # @param size_in_gb [Float] Model size in GB
+    # @param sources [Hash] Source repositories
+    # @param model_file [String] Path to ONNX model file
+    # @param tokenizer_file [String] Path to tokenizer file
+    # @param pooling [Symbol] Pooling strategy (:mean or :cls)
+    # @param normalize [Boolean] Whether to L2 normalize outputs
+    # @param max_length [Integer] Maximum sequence length
     def initialize(
       model_name:,
       dim:,

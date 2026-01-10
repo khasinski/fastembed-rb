@@ -2,8 +2,31 @@
 
 require_relative 'fastembed/version'
 
+# Fastembed - Fast, lightweight text embeddings for Ruby
+#
+# A Ruby port of FastEmbed providing text embeddings using ONNX Runtime.
+# Supports dense embeddings, sparse embeddings (SPLADE), late interaction (ColBERT),
+# and cross-encoder reranking.
+#
+# @example Basic text embedding
+#   embedding = Fastembed::TextEmbedding.new
+#   vectors = embedding.embed(["Hello world", "Ruby is great"]).to_a
+#
+# @example Reranking documents
+#   reranker = Fastembed::TextCrossEncoder.new
+#   scores = reranker.rerank(query: "What is ML?", documents: docs)
+#
+# @example Sparse embeddings
+#   sparse = Fastembed::TextSparseEmbedding.new
+#   embeddings = sparse.embed(["Hello"]).to_a
+#
+# @see https://github.com/khasinski/fastembed-rb
+#
 module Fastembed
+  # Base error class for all Fastembed errors
   class Error < StandardError; end
+
+  # Raised when model download fails
   class DownloadError < Error; end
 end
 

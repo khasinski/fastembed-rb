@@ -1,0 +1,6 @@
+--markup markdown
+--title "Fastembed Ruby API Documentation"
+--output-dir doc
+--readme README.md
+--files CHANGELOG.md,BENCHMARKS.md
+lib/**/*.rb

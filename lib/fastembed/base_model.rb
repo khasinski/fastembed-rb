@@ -5,7 +5,20 @@ require 'tokenizers'
 
 module Fastembed
   # Shared functionality for model classes
+  #
+  # This module provides common initialization and utility methods used by
+  # all model types (TextEmbedding, TextCrossEncoder, TextSparseEmbedding, etc.).
+  # It handles model downloading, ONNX session creation, and tokenizer loading.
+  #
+  # @abstract Include in model classes and call {#initialize_model}
+  #
   module BaseModel
+    # @!attribute [r] model_name
+    #   @return [String] Name of the loaded model
+    # @!attribute [r] model_info
+    #   @return [BaseModelInfo] Model metadata and configuration
+    # @!attribute [r] quantization
+    #   @return [Symbol] Current quantization type
     attr_reader :model_name, :model_info, :quantization
 
     private
@@ -31,6 +44,8 @@ module Fastembed
       @model_dir = retrieve_model(model_name, show_progress: show_progress)
     end
 
+    # Validate that the quantization type is supported
+    # @raise [ArgumentError] If quantization type is invalid
     def validate_quantization!
       return if Quantization.valid?(@quantization)
 
@@ -39,15 +54,26 @@ module Fastembed
     end
 
     # Get the model file path, accounting for quantization
+    # @return [String] Path to quantized model file (or base if fp32)
     def quantized_model_file
       Quantization.model_file(@model_info.model_file, @quantization)
     end
 
     # Override in subclasses to resolve from appropriate registry
+    #
+    # @param _model_name [String] Name of the model
+    # @return [BaseModelInfo] Model information object
+    # @raise [NotImplementedError] If not overridden in subclass
+    # @abstract
     def resolve_model_info(_model_name)
       raise NotImplementedError, 'Subclasses must implement resolve_model_info'
     end
 
+    # Download or retrieve cached model
+    #
+    # @param model_name [String] Name of the model
+    # @param show_progress [Boolean] Whether to show download progress
+    # @return [String] Path to model directory
     def retrieve_model(model_name, show_progress:)
       ModelManagement.retrieve_model(
         model_name,
@@ -56,6 +82,8 @@ module Fastembed
       )
     end
 
+    # Build ONNX session options hash
+    # @return [Hash] Options for OnnxRuntime::InferenceSession
     def build_session_options
       options = {}
       options[:inter_op_num_threads] = @threads if @threads
@@ -63,6 +91,12 @@ module Fastembed
       options
     end
 
+    # Load an ONNX inference session
+    #
+    # @param model_path [String] Path to ONNX model file
+    # @param providers [Array<String>, nil] Execution providers
+    # @return [OnnxRuntime::InferenceSession] The loaded session
+    # @raise [Error] If model file not found
     def load_onnx_session(model_path, providers: nil)
       raise Error, "Model file not found: #{model_path}" unless File.exist?(model_path)
 
@@ -73,6 +107,12 @@ module Fastembed
       )
     end
 
+    # Load a HuggingFace tokenizer from file
+    #
+    # @param tokenizer_path [String] Path to tokenizer.json
+    # @param max_length [Integer] Maximum sequence length for truncation
+    # @return [Tokenizers::Tokenizer] Configured tokenizer
+    # @raise [Error] If tokenizer file not found
     def load_tokenizer_from_file(tokenizer_path, max_length:)
       raise Error, "Tokenizer not found: #{tokenizer_path}" unless File.exist?(tokenizer_path)
 

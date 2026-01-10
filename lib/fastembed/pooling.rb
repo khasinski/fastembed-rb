@@ -1,10 +1,21 @@
 # frozen_string_literal: true
 
 module Fastembed
-  # Pooling strategies for transformer outputs
+  # Pooling strategies for transformer model outputs
+  #
+  # Transforms variable-length token embeddings into fixed-size sentence embeddings.
+  # Supports mean pooling (default) and CLS token pooling.
+  #
+  # @example Apply mean pooling with normalization
+  #   pooled = Pooling.apply(:mean, token_embeddings, attention_mask)
+  #
   module Pooling
     class << self
       # Mean pooling - averages all token embeddings weighted by attention mask
+      #
+      # @param token_embeddings [Array<Array<Array<Float>>>] Token embeddings [batch, seq, hidden]
+      # @param attention_mask [Array<Array<Integer>>] Attention mask [batch, seq]
+      # @return [Array<Array<Float>>] Pooled embeddings [batch, hidden]
       def mean_pooling(token_embeddings, attention_mask)
         # token_embeddings: [batch_size, seq_len, hidden_size]
         # attention_mask: [batch_size, seq_len]
@@ -40,11 +51,18 @@ module Fastembed
       end
 
       # CLS pooling - uses the [CLS] token embedding (first token)
+      #
+      # @param token_embeddings [Array<Array<Array<Float>>>] Token embeddings [batch, seq, hidden]
+      # @param _attention_mask [Array<Array<Integer>>] Attention mask (unused)
+      # @return [Array<Array<Float>>] Pooled embeddings [batch, hidden]
       def cls_pooling(token_embeddings, _attention_mask)
         token_embeddings.map { |batch| batch[0] }
       end
 
-      # L2 normalize vectors
+      # L2 normalize vectors to unit length
+      #
+      # @param vectors [Array<Array<Float>>] Vectors to normalize
+      # @return [Array<Array<Float>>] Normalized vectors
       def normalize(vectors)
         vectors.map do |vector|
           norm = Math.sqrt(vector.sum { |v| v * v })
@@ -53,7 +71,14 @@ module Fastembed
         end
       end
 
-      # Apply pooling based on strategy
+      # Apply pooling strategy to token embeddings
+      #
+      # @param strategy [Symbol] Pooling strategy (:mean or :cls)
+      # @param token_embeddings [Array] Token embeddings from model
+      # @param attention_mask [Array] Attention mask
+      # @param should_normalize [Boolean] Whether to L2 normalize output
+      # @return [Array<Array<Float>>] Pooled embeddings
+      # @raise [ArgumentError] If unknown pooling strategy
       def apply(strategy, token_embeddings, attention_mask, should_normalize: true)
         pooled = case strategy
                  when :mean

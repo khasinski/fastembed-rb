@@ -2,9 +2,25 @@
 
 module Fastembed
   # Model information for reranker/cross-encoder models
+  #
+  # Cross-encoders process query-document pairs together rather than
+  # encoding them separately, enabling more accurate relevance scoring.
+  #
+  # @example Access reranker info
+  #   info = Fastembed::SUPPORTED_RERANKER_MODELS['BAAI/bge-reranker-base']
+  #   info.model_name  # => "BAAI/bge-reranker-base"
+  #
   class RerankerModelInfo
     include BaseModelInfo
 
+    # Create a new RerankerModelInfo instance
+    #
+    # @param model_name [String] Full model identifier
+    # @param description [String] Human-readable description
+    # @param size_in_gb [Float] Model size in GB
+    # @param sources [Hash] Source repositories
+    # @param model_file [String] Path to ONNX model file
+    # @param tokenizer_file [String] Path to tokenizer file
     def initialize(
       model_name:,
       description:,
@@ -23,6 +39,8 @@ module Fastembed
       )
     end
 
+    # Convert to hash representation
+    # @return [Hash] Model info as a hash
     def to_h
       {
         model_name: model_name,
