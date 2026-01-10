@@ -145,6 +145,54 @@ module Fastembed
       embed(prefixed, batch_size: batch_size)
     end
 
+    # Generate embeddings asynchronously in a background thread
+    #
+    # Returns immediately with a Future object. The embedding computation
+    # runs in a background thread. Call `value` on the Future to get results.
+    #
+    # @param documents [Array<String>, String] Text document(s) to embed
+    # @param batch_size [Integer] Number of documents to process at once
+    # @return [Async::Future] Future that resolves to array of embedding vectors
+    #
+    # @example Basic async usage
+    #   future = embedding.embed_async(documents)
+    #   # ... do other work ...
+    #   vectors = future.value  # blocks until complete
+    #
+    # @example Parallel embedding of multiple batches
+    #   futures = documents.each_slice(1000).map do |batch|
+    #     embedding.embed_async(batch)
+    #   end
+    #   all_vectors = futures.flat_map(&:value)
+    #
+    def embed_async(documents, batch_size: 256)
+      Async::Future.new do
+        embed(documents, batch_size: batch_size).to_a
+      end
+    end
+
+    # Generate query embeddings asynchronously
+    #
+    # @param queries [Array<String>, String] Query text(s) to embed
+    # @param batch_size [Integer] Number of queries to process at once
+    # @return [Async::Future] Future that resolves to array of embedding vectors
+    def query_embed_async(queries, batch_size: 256)
+      Async::Future.new do
+        query_embed(queries, batch_size: batch_size).to_a
+      end
+    end
+
+    # Generate passage embeddings asynchronously
+    #
+    # @param passages [Array<String>, String] Passage text(s) to embed
+    # @param batch_size [Integer] Number of passages to process at once
+    # @return [Async::Future] Future that resolves to array of embedding vectors
+    def passage_embed_async(passages, batch_size: 256)
+      Async::Future.new do
+        passage_embed(passages, batch_size: batch_size).to_a
+      end
+    end
+
     # List all supported models
     #
     # @return [Array<Hash>] Array of model information hashes

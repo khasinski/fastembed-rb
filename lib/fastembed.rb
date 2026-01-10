@@ -20,6 +20,10 @@ require_relative 'fastembed/version'
 #   sparse = Fastembed::TextSparseEmbedding.new
 #   embeddings = sparse.embed(["Hello"]).to_a
 #
+# @example Async embedding
+#   future = embedding.embed_async(large_document_list)
+#   vectors = future.value  # blocks until complete
+#
 # @see https://github.com/khasinski/fastembed-rb
 #
 module Fastembed
@@ -39,6 +43,7 @@ require_relative 'fastembed/model_management'
 require_relative 'fastembed/pooling'
 require_relative 'fastembed/quantization'
 require_relative 'fastembed/progress'
+require_relative 'fastembed/async'
 require_relative 'fastembed/base_model'
 require_relative 'fastembed/onnx_embedding_model'
 require_relative 'fastembed/text_embedding'
