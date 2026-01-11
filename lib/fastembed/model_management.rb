@@ -103,17 +103,22 @@ module Fastembed
 
       # Resolve model name to ModelInfo from registry
       #
+      # Checks both built-in registry and custom model registry.
+      #
       # @param model_name [String] Model name to look up
       # @return [ModelInfo] The model information
-      # @raise [ArgumentError] If model is not found in registry
+      # @raise [ArgumentError] If model is not found in any registry
       def resolve_model_info(model_name)
+        # Check built-in registry first
         model_info = SUPPORTED_MODELS[model_name]
-        unless model_info
-          raise ArgumentError,
-                "Unknown model: #{model_name}. Use TextEmbedding.list_supported_models to see available models."
-        end
+        return model_info if model_info
 
-        model_info
+        # Check custom registry
+        model_info = CustomModelRegistry.embedding_models[model_name]
+        return model_info if model_info
+
+        raise ArgumentError,
+              "Unknown model: #{model_name}. Use TextEmbedding.list_supported_models to see available models."
       end
 
       private

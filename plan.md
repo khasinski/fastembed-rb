@@ -85,25 +85,21 @@ vector = image_embed.embed(["path/to/image.jpg"]).first
 - May need `mini_magick` or `vips` gem for image loading
 - CLIP models can embed both images and text into same space
 
-#### 5. Custom Model Support
-Allow users to load arbitrary ONNX models not in the registry.
+#### ~~5. Custom Model Support~~ ✅ IMPLEMENTED
 
-**API design:**
+Implemented via `CustomModelRegistry` module. Users can register custom models:
+
 ```ruby
-Fastembed.add_custom_model(
+Fastembed.register_model(
   model_name: "my-org/my-model",
   dim: 768,
-  sources: { hf: "my-org/my-model" },
-  model_file: "model.onnx"
+  sources: { hf: "my-org/my-model" }
 )
 
 embed = Fastembed::TextEmbedding.new(model_name: "my-org/my-model")
 ```
 
-**Implementation notes:**
-- Validate ONNX model structure
-- Allow custom pooling strategies
-- Support local file paths in addition to HuggingFace
+Also supports local model loading via `local_model_dir` parameter.
 
 ### Low Priority
 
@@ -127,16 +123,16 @@ Support for INT8/INT4 quantized models for faster inference and lower memory usa
 - Need to add quantized model variants to registry
 - Trade-off between speed and accuracy
 
-## CLI Enhancements
+## ~~CLI Enhancements~~ ✅ IMPLEMENTED
 
-Future CLI features to consider:
+All planned CLI features have been implemented:
 
-- `fastembed download <model>` - Pre-download models
-- `fastembed benchmark` - Run performance benchmarks
-- `fastembed info <model>` - Show detailed model information
-- Support for reading from files (`-i input.txt`)
-- Progress bar for large inputs
-- Quiet mode (`-q`) for scripting
+- ✅ `fastembed download <model>` - Pre-download models for offline use
+- ✅ `fastembed benchmark` - Run performance benchmarks with configurable iterations
+- ✅ `fastembed info <model>` - Show detailed model information including cache status
+- ✅ `-i input.txt` - Read texts from file (one per line)
+- ✅ `-p` / `--progress` - Show progress bar during embedding
+- ✅ `-q` / `--quiet` - Suppress progress output for scripting
 
 ## Breaking Changes for v2.0
 

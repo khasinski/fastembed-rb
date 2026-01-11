@@ -186,11 +186,12 @@ module Fastembed
       end
     end
 
-    # List all supported models
+    # List all supported models (built-in and custom)
     #
     # @return [Array<Hash>] Array of model information hashes
     def self.list_supported_models
-      SUPPORTED_MODELS.values.map(&:to_h)
+      all_models = SUPPORTED_MODELS.merge(CustomModelRegistry.embedding_models)
+      all_models.values.map(&:to_h)
     end
 
     # Get information about a specific model
@@ -198,7 +199,8 @@ module Fastembed
     # @param model_name [String] Name of the model
     # @return [Hash, nil] Model information or nil if not found
     def self.get_model_info(model_name)
-      SUPPORTED_MODELS[model_name]&.to_h
+      info = SUPPORTED_MODELS[model_name] || CustomModelRegistry.embedding_models[model_name]
+      info&.to_h
     end
 
     private
@@ -218,8 +220,10 @@ module Fastembed
 
       validate_quantization!
 
-      # Try to get model info from registry, or create a minimal one
-      @model_info = SUPPORTED_MODELS[model_name] || create_local_model_info(
+      # Try to get model info from registry (built-in or custom), or create a minimal one
+      @model_info = SUPPORTED_MODELS[model_name] ||
+                    CustomModelRegistry.embedding_models[model_name] ||
+                    create_local_model_info(
         model_name: model_name,
         model_file: model_file,
         tokenizer_file: tokenizer_file

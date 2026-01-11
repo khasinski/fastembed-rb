@@ -39,6 +39,12 @@ module Fastembed
         rerank
       when 'cache'
         cache_command
+      when 'download'
+        download_command
+      when 'info'
+        info_command
+      when 'benchmark'
+        benchmark_command
       when 'version', '-v', '--version'
         puts "fastembed #{Fastembed::VERSION}"
       when 'help', nil
@@ -83,6 +89,9 @@ module Fastembed
           embed           Generate dense embeddings for text
           sparse-embed    Generate sparse (SPLADE) embeddings for text
           rerank          Rerank documents by relevance to a query
+          download        Pre-download a model for offline use
+          info            Show detailed information about a model
+          benchmark       Run performance benchmarks
           list-models     List available dense embedding models
           list-sparse     List available sparse embedding models
           list-rerankers  List available reranker models
@@ -132,12 +141,18 @@ module Fastembed
       texts = gather_texts
 
       if texts.empty?
-        warn 'Error: No text provided. Pass text as arguments or pipe through stdin.'
+        warn 'Error: No text provided. Pass text as arguments, use -i FILE, or pipe through stdin.'
         exit 1
       end
 
-      embedding = Fastembed::TextEmbedding.new(model_name: @options[:model])
-      embeddings = embedding.embed(texts, batch_size: @options[:batch_size]).to_a
+      show_progress = !@options[:quiet]
+      embedding = Fastembed::TextEmbedding.new(model_name: @options[:model], show_progress: show_progress)
+
+      embeddings = if @options[:show_progress] && !@options[:quiet]
+                     embed_with_progress(embedding, texts)
+                   else
+                     embedding.embed(texts, batch_size: @options[:batch_size]).to_a
+                   end
 
       output_embeddings(texts, embeddings)
     end
@@ -156,6 +171,18 @@ module Fastembed
 
         opts.on('-b', '--batch-size SIZE', Integer, 'Batch size (default: 256)') do |b|
           @options[:batch_size] = b
+        end
+
+        opts.on('-i', '--input FILE', 'Read texts from file (one per line)') do |file|
+          @options[:input_file] = file
+        end
+
+        opts.on('-q', '--quiet', 'Suppress progress output') do
+          @options[:quiet] = true
+        end
+
+        opts.on('-p', '--progress', 'Show progress bar') do
+          @options[:show_progress] = true
         end
 
         opts.on('-h', '--help', 'Show help') do
@@ -226,13 +253,41 @@ module Fastembed
     end
 
     def gather_texts
-      if @argv.any?
+      # Priority: -i file > arguments > stdin
+      if @options[:input_file]
+        read_texts_from_file(@options[:input_file])
+      elsif @argv.any?
         @argv
       elsif !$stdin.tty?
         $stdin.read.split("\n").reject(&:empty?)
       else
         []
       end
+    end
+
+    def read_texts_from_file(file_path)
+      unless File.exist?(file_path)
+        warn "Error: File not found: #{file_path}"
+        exit 1
+      end
+
+      File.readlines(file_path, chomp: true).reject(&:empty?)
+    end
+
+    def embed_with_progress(embedding, texts)
+      total = texts.length
+      batch_size = @options[:batch_size]
+      total_batches = (total.to_f / batch_size).ceil
+      embeddings = embedding.embed(texts, batch_size: batch_size) do |progress|
+        percent = (progress.current.to_f / progress.total * 100).round
+        bar_width = 30
+        filled = (bar_width * progress.current / progress.total).round
+        bar = ('=' * filled) + ('-' * (bar_width - filled))
+        $stderr.print "\r[#{bar}] #{percent}% (#{progress.current}/#{total_batches} batches)"
+      end.map { |emb| emb }
+
+      $stderr.puts
+      embeddings
     end
 
     def output_embeddings(texts, embeddings)
@@ -437,6 +492,235 @@ module Fastembed
       else
         "#{bytes} B"
       end
+    end
+
+    # Download command - pre-download models for offline use
+    def download_command
+      parse_download_options
+
+      model_name = @argv.shift
+      if model_name.nil?
+        warn 'Error: Model name required.'
+        warn 'Usage: fastembed download <model-name>'
+        warn "\nExamples:"
+        warn '  fastembed download BAAI/bge-small-en-v1.5'
+        warn '  fastembed download --type reranker cross-encoder/ms-marco-MiniLM-L-6-v2'
+        exit 1
+      end
+
+      model_type = @options[:download_type] || :embedding
+
+      begin
+        model_info = resolve_model_for_download(model_name, model_type)
+        puts "Downloading #{model_name}..."
+        ModelManagement.retrieve_model(model_name, model_info: model_info, show_progress: true)
+        puts 'Download complete!'
+      rescue ArgumentError => e
+        warn "Error: #{e.message}"
+        exit 1
+      rescue DownloadError => e
+        warn "Download failed: #{e.message}"
+        exit 1
+      end
+    end
+
+    def parse_download_options
+      OptionParser.new do |opts|
+        opts.banner = 'Usage: fastembed download [options] <model-name>'
+
+        opts.on('-t', '--type TYPE', %w[embedding reranker sparse late-interaction],
+                'Model type (embedding, reranker, sparse, late-interaction)') do |t|
+          @options[:download_type] = t.tr('-', '_').to_sym
+        end
+
+        opts.on('-h', '--help', 'Show help') do
+          puts opts
+          puts "\nExamples:"
+          puts '  fastembed download BAAI/bge-small-en-v1.5'
+          puts '  fastembed download --type reranker cross-encoder/ms-marco-MiniLM-L-6-v2'
+          exit 0
+        end
+      end.parse!(@argv)
+    end
+
+    def resolve_model_for_download(model_name, type)
+      registry = case type
+                 when :embedding
+                   SUPPORTED_MODELS.merge(CustomModelRegistry.embedding_models)
+                 when :reranker
+                   SUPPORTED_RERANKER_MODELS.merge(CustomModelRegistry.reranker_models)
+                 when :sparse
+                   SUPPORTED_SPARSE_MODELS.merge(CustomModelRegistry.sparse_models)
+                 when :late_interaction
+                   SUPPORTED_LATE_INTERACTION_MODELS.merge(CustomModelRegistry.late_interaction_models)
+                 else
+                   SUPPORTED_MODELS.merge(CustomModelRegistry.embedding_models)
+                 end
+
+      model_info = registry[model_name]
+      raise ArgumentError, "Unknown #{type} model: #{model_name}" unless model_info
+
+      model_info
+    end
+
+    # Info command - show detailed model information
+    def info_command
+      parse_info_options
+
+      model_name = @argv.shift
+      if model_name.nil?
+        warn 'Error: Model name required.'
+        warn 'Usage: fastembed info <model-name>'
+        exit 1
+      end
+
+      model_info = find_model_info(model_name)
+      if model_info.nil?
+        warn "Unknown model: #{model_name}"
+        exit 1
+      end
+
+      display_model_info(model_name, model_info)
+    end
+
+    def parse_info_options
+      OptionParser.new do |opts|
+        opts.banner = 'Usage: fastembed info <model-name>'
+
+        opts.on('-h', '--help', 'Show help') do
+          puts opts
+          exit 0
+        end
+      end.parse!(@argv)
+    end
+
+    def find_model_info(model_name)
+      # Search all registries
+      SUPPORTED_MODELS[model_name] ||
+        CustomModelRegistry.embedding_models[model_name] ||
+        SUPPORTED_RERANKER_MODELS[model_name] ||
+        CustomModelRegistry.reranker_models[model_name] ||
+        SUPPORTED_SPARSE_MODELS[model_name] ||
+        CustomModelRegistry.sparse_models[model_name] ||
+        SUPPORTED_LATE_INTERACTION_MODELS[model_name] ||
+        CustomModelRegistry.late_interaction_models[model_name]
+    end
+
+    def display_model_info(model_name, info)
+      puts "Model: #{model_name}"
+      puts "  Description: #{info.description}"
+      puts "  Size: #{info.size_in_gb} GB"
+      puts "  Max Length: #{info.max_length} tokens"
+      puts "  Model File: #{info.model_file}"
+      puts "  Tokenizer: #{info.tokenizer_file}"
+
+      # Type-specific info
+      puts "  Dimensions: #{info.dim}" if info.respond_to?(:dim)
+      puts "  Pooling: #{info.pooling}" if info.respond_to?(:pooling)
+      puts "  Normalize: #{info.normalize}" if info.respond_to?(:normalize)
+
+      # Source info
+      puts "  HuggingFace: https://huggingface.co/#{info.sources[:hf]}" if info.sources[:hf]
+
+      # Cache status
+      cache_path = ModelManagement.model_directory(info)
+      if ModelManagement.model_cached?(cache_path, info)
+        size = directory_size(cache_path)
+        puts "  Cached: Yes (#{format_size(size)})"
+      else
+        puts '  Cached: No'
+      end
+    end
+
+    # Benchmark command - run performance benchmarks
+    def benchmark_command
+      parse_benchmark_options
+
+      model_name = @options[:model]
+      iterations = @options[:iterations]
+      batch_size = @options[:batch_size]
+
+      puts "Benchmarking #{model_name}..."
+      puts "  Iterations: #{iterations}"
+      puts "  Batch size: #{batch_size}"
+      puts
+
+      # Sample texts for benchmarking
+      sample_texts = [
+        'The quick brown fox jumps over the lazy dog.',
+        'Machine learning is transforming how we build software.',
+        'Ruby is a dynamic, open source programming language.',
+        'Embeddings convert text into numerical vectors.'
+      ] * ((batch_size / 4) + 1)
+      sample_texts = sample_texts.first(batch_size)
+
+      begin
+        # Load model (measure load time)
+        puts 'Loading model...'
+        load_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        embedding = Fastembed::TextEmbedding.new(model_name: model_name)
+        load_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) - load_start
+        puts "  Load time: #{format('%.2f', load_time)}s"
+        puts
+
+        # Warmup
+        puts 'Warming up...'
+        embedding.embed(sample_texts.first(4)).to_a
+
+        # Benchmark
+        puts "Running #{iterations} iterations..."
+        times = []
+        iterations.times do |i|
+          start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          embedding.embed(sample_texts, batch_size: batch_size).to_a
+          elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+          times << elapsed
+          print "\r  Progress: #{i + 1}/#{iterations}"
+        end
+        puts
+
+        # Results
+        puts
+        puts 'Results:'
+        avg_time = times.sum / times.length
+        min_time = times.min
+        max_time = times.max
+        throughput = batch_size / avg_time
+
+        puts "  Avg time: #{format('%.3f', avg_time)}s"
+        puts "  Min time: #{format('%.3f', min_time)}s"
+        puts "  Max time: #{format('%.3f', max_time)}s"
+        puts "  Throughput: #{format('%.1f', throughput)} texts/sec"
+        puts "  Dimensions: #{embedding.dim}"
+      rescue StandardError => e
+        warn "Benchmark failed: #{e.message}"
+        exit 1
+      end
+    end
+
+    def parse_benchmark_options
+      @options[:iterations] = 10
+
+      OptionParser.new do |opts|
+        opts.banner = 'Usage: fastembed benchmark [options]'
+
+        opts.on('-m', '--model MODEL', 'Model to benchmark (default: BAAI/bge-small-en-v1.5)') do |m|
+          @options[:model] = m
+        end
+
+        opts.on('-n', '--iterations N', Integer, 'Number of iterations (default: 10)') do |n|
+          @options[:iterations] = n
+        end
+
+        opts.on('-b', '--batch-size SIZE', Integer, 'Batch size (default: 256)') do |b|
+          @options[:batch_size] = b
+        end
+
+        opts.on('-h', '--help', 'Show help') do
+          puts opts
+          exit 0
+        end
+      end.parse!(@argv)
     end
   end
 end

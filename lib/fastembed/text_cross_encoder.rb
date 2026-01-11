@@ -139,10 +139,15 @@ module Fastembed
     private
 
     def resolve_model_info(model_name)
+      # Check built-in registry first
       info = SUPPORTED_RERANKER_MODELS[model_name]
-      raise Error, "Unknown reranker model: #{model_name}" unless info
+      return info if info
 
-      info
+      # Check custom registry
+      info = CustomModelRegistry.reranker_models[model_name]
+      return info if info
+
+      raise Error, "Unknown reranker model: #{model_name}"
     end
 
     def create_local_model_info(model_name:, model_file:, tokenizer_file:)

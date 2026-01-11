@@ -203,10 +203,15 @@ module Fastembed
     private
 
     def resolve_model_info(model_name)
+      # Check built-in registry first
       info = SUPPORTED_LATE_INTERACTION_MODELS[model_name]
-      raise Error, "Unknown late interaction model: #{model_name}" unless info
+      return info if info
 
-      info
+      # Check custom registry
+      info = CustomModelRegistry.late_interaction_models[model_name]
+      return info if info
+
+      raise Error, "Unknown late interaction model: #{model_name}"
     end
 
     def create_local_model_info(model_name:, model_file:, tokenizer_file:)
