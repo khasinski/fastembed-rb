@@ -40,19 +40,17 @@ module Fastembed
         @condition = ConditionVariable.new
 
         @thread = Thread.new do
-          begin
-            result = block.call
-            @mutex.synchronize do
-              @result = result
-              @completed = true
-              @condition.broadcast
-            end
-          rescue StandardError => e
-            @mutex.synchronize do
-              @error = e
-              @completed = true
-              @condition.broadcast
-            end
+          result = block.call
+          @mutex.synchronize do
+            @result = result
+            @completed = true
+            @condition.broadcast
+          end
+        rescue StandardError => e
+          @mutex.synchronize do
+            @error = e
+            @completed = true
+            @condition.broadcast
           end
         end
       end
@@ -149,11 +147,9 @@ module Fastembed
       # @return [Future] A new Future that handles errors
       def rescue(&block)
         Future.new do
-          begin
-            value
-          rescue StandardError => e
-            block.call(e)
-          end
+          value
+        rescue StandardError => e
+          block.call(e)
         end
       end
     end
@@ -174,19 +170,23 @@ module Fastembed
     # @param futures [Array<Future>] Futures to race
     # @param timeout [Numeric, nil] Maximum seconds to wait
     # @return [Object] Result from first completed future
+    # @raise [Timeout::Error] If timeout expires before any future completes
     def self.race(futures, timeout: nil)
+      raise ArgumentError, 'No futures provided' if futures.empty?
+
       deadline = timeout ? Time.now + timeout : nil
+      sleep_time = 0.001 # Start with 1ms
 
       loop do
         futures.each do |future|
           return future.value if future.complete?
         end
 
-        if deadline && Time.now >= deadline
-          raise Timeout::Error, 'No future completed within timeout'
-        end
+        raise Timeout::Error, 'No future completed within timeout' if deadline && Time.now >= deadline
 
-        sleep 0.001 # Small sleep to avoid busy waiting
+        sleep sleep_time
+        # Exponential backoff up to 10ms to reduce CPU usage for long waits
+        sleep_time = [sleep_time * 1.5, 0.01].min
       end
     end
   end

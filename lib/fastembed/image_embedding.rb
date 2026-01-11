@@ -41,7 +41,9 @@ module Fastembed
         size_in_gb: size_in_gb,
         sources: sources,
         model_file: model_file,
-        image_size: image_size
+        image_size: image_size,
+        mean: mean,
+        std: std
       }
     end
   end
@@ -101,25 +103,33 @@ module Fastembed
     # @param threads [Integer, nil] Number of threads for ONNX Runtime
     # @param providers [Array<String>, nil] ONNX execution providers
     # @param show_progress [Boolean] Whether to show download progress
+    # @param local_model_dir [String, nil] Load model from local directory instead of downloading
+    # @param model_file [String, nil] Override model file name (e.g., "model.onnx")
     def initialize(
       model_name: DEFAULT_IMAGE_MODEL,
       cache_dir: nil,
       threads: nil,
       providers: nil,
-      show_progress: true
+      show_progress: true,
+      local_model_dir: nil,
+      model_file: nil
     )
       require_mini_magick!
 
       @model_name = model_name
       @threads = threads
       @providers = providers || ['CPUExecutionProvider']
+      @model_file_override = model_file
 
-      ModelManagement.cache_dir = cache_dir if cache_dir
+      if local_model_dir
+        initialize_from_local(local_model_dir: local_model_dir, model_name: model_name, model_file: model_file)
+      else
+        ModelManagement.cache_dir = cache_dir if cache_dir
+        @model_info = resolve_model_info(model_name)
+        @model_dir = retrieve_model(model_name, show_progress: show_progress)
+      end
 
-      @model_info = resolve_model_info(model_name)
-      @model_dir = retrieve_model(model_name, show_progress: show_progress)
       @dim = @model_info.dim
-
       setup_model
     end
 
@@ -179,6 +189,28 @@ module Fastembed
       info
     end
 
+    def initialize_from_local(local_model_dir:, model_name:, model_file:)
+      raise ArgumentError, "Local model directory not found: #{local_model_dir}" unless Dir.exist?(local_model_dir)
+
+      @model_dir = local_model_dir
+      @model_info = SUPPORTED_IMAGE_MODELS[model_name] || create_local_model_info(
+        model_name: model_name,
+        model_file: model_file
+      )
+    end
+
+    def create_local_model_info(model_name:, model_file:)
+      ImageModelInfo.new(
+        model_name: model_name,
+        dim: 512, # Default CLIP dimension
+        description: 'Local image model',
+        size_in_gb: 0,
+        sources: {},
+        model_file: model_file || 'model.onnx',
+        image_size: 224
+      )
+    end
+
     def retrieve_model(model_name, show_progress:)
       ModelManagement.retrieve_model(
         model_name,
@@ -188,7 +220,8 @@ module Fastembed
     end
 
     def setup_model
-      model_path = File.join(@model_dir, @model_info.model_file)
+      model_file = @model_file_override || @model_info.model_file
+      model_path = File.join(@model_dir, model_file)
       raise Error, "Model file not found: #{model_path}" unless File.exist?(model_path)
 
       options = {}

@@ -216,9 +216,20 @@ module Fastembed
       end
     end
 
+    # Transform token logits into sparse embedding using SPLADE algorithm
+    #
+    # SPLADE (Sparse Lexical AnD Expansion) uses a log-saturation function:
+    # weight = log(1 + ReLU(logit))
+    #
+    # This ensures:
+    # - ReLU removes negative activations (irrelevant terms)
+    # - log1p provides saturation to prevent any term from dominating
+    # - Max-pooling across positions captures the strongest signal per vocabulary term
+    #
+    # @param token_logits [Array<Array<Float>>] Logits for each token position
+    # @param attention_mask [Array<Integer>] Mask indicating valid positions
+    # @return [SparseEmbedding] Sparse vector with vocabulary indices and weights
     def create_sparse_embedding(token_logits, attention_mask)
-      # Apply SPLADE transformation: log(1 + ReLU(x))
-      # and max-pool across sequence positions
       vocab_size = token_logits.first.length
       max_weights = Array.new(vocab_size, 0.0)
 
@@ -226,9 +237,8 @@ module Fastembed
         next if attention_mask[pos].zero?
 
         logits.each_with_index do |logit, vocab_idx|
-          # ReLU
+          # SPLADE transformation: log(1 + ReLU(x))
           activated = logit.positive? ? logit : 0.0
-          # log(1 + x)
           weight = Math.log(1.0 + activated)
           max_weights[vocab_idx] = weight if weight > max_weights[vocab_idx]
         end

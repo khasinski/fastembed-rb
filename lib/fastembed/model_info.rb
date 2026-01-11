@@ -35,6 +35,7 @@ module Fastembed
     # @param pooling [Symbol] Pooling strategy (:mean or :cls)
     # @param normalize [Boolean] Whether to L2 normalize outputs
     # @param max_length [Integer] Maximum sequence length
+    # @raise [ArgumentError] If pooling strategy is invalid
     def initialize(
       model_name:,
       dim:,
@@ -47,6 +48,11 @@ module Fastembed
       normalize: true,
       max_length: BaseModelInfo::DEFAULT_MAX_LENGTH
     )
+      unless Pooling.valid?(pooling)
+        valid = Pooling::VALID_STRATEGIES.join(', ')
+        raise ArgumentError, "Invalid pooling strategy: #{pooling}. Valid strategies: #{valid}"
+      end
+
       initialize_base(
         model_name: model_name,
         description: description,

@@ -34,6 +34,7 @@ module Fastembed
   class DownloadError < Error; end
 end
 
+require_relative 'fastembed/pooling'
 require_relative 'fastembed/base_model_info'
 require_relative 'fastembed/model_info'
 require_relative 'fastembed/reranker_model_info'
@@ -41,7 +42,6 @@ require_relative 'fastembed/sparse_model_info'
 require_relative 'fastembed/late_interaction_model_info'
 require_relative 'fastembed/custom_model_registry'
 require_relative 'fastembed/model_management'
-require_relative 'fastembed/pooling'
 require_relative 'fastembed/quantization'
 require_relative 'fastembed/progress'
 require_relative 'fastembed/async'

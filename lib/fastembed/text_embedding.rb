@@ -209,27 +209,6 @@ module Fastembed
       ModelManagement.resolve_model_info(model_name)
     end
 
-    def initialize_from_local(local_model_dir:, model_name:, threads:, providers:, quantization:, model_file:, tokenizer_file:)
-      raise ArgumentError, "Local model directory not found: #{local_model_dir}" unless Dir.exist?(local_model_dir)
-
-      @model_name = model_name
-      @threads = threads
-      @providers = providers
-      @quantization = quantization || Quantization::DEFAULT
-      @model_dir = local_model_dir
-
-      validate_quantization!
-
-      # Try to get model info from registry (built-in or custom), or create a minimal one
-      @model_info = SUPPORTED_MODELS[model_name] ||
-                    CustomModelRegistry.embedding_models[model_name] ||
-                    create_local_model_info(
-        model_name: model_name,
-        model_file: model_file,
-        tokenizer_file: tokenizer_file
-      )
-    end
-
     def create_local_model_info(model_name:, model_file:, tokenizer_file:)
       # Detect dimension from model output shape if possible
       # For now, use a placeholder that will be updated after model load
@@ -244,24 +223,29 @@ module Fastembed
       )
     end
 
+    # Detect embedding dimension from ONNX model output shape
+    #
+    # @param model_file [String, nil] Model filename to inspect
+    # @return [Integer, nil] Detected dimension or nil if detection fails
     def detect_model_dimension(model_file)
-      # Try to detect dimension from ONNX model metadata
       model_path = File.join(@model_dir, model_file || 'model.onnx')
       return nil unless File.exist?(model_path)
 
-      begin
-        session = OnnxRuntime::InferenceSession.new(model_path)
-        # Look for output shape - usually [batch, seq_len, hidden_size] or [batch, hidden_size]
-        output = session.outputs.first
-        return nil unless output && output[:shape]
+      session = OnnxRuntime::InferenceSession.new(model_path)
+      # Look for output shape - usually [batch, seq_len, hidden_size] or [batch, hidden_size]
+      output = session.outputs.first
+      return nil unless output && output[:shape]
 
-        shape = output[:shape]
-        # Last dimension is usually the embedding dimension
-        dim = shape.last
-        dim.is_a?(Integer) && dim > 0 ? dim : nil
-      rescue StandardError
-        nil
-      end
+      shape = output[:shape]
+      # Last dimension is usually the embedding dimension
+      dim = shape.last
+      dim.is_a?(Integer) && dim.positive? ? dim : nil
+    rescue OnnxRuntime::Error => e
+      warn "Warning: Could not detect model dimension: #{e.message}"
+      nil
+    rescue StandardError => e
+      warn "Warning: Unexpected error detecting model dimension: #{e.class} - #{e.message}"
+      nil
     end
   end
 end

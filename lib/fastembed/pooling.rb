@@ -10,6 +10,17 @@ module Fastembed
   #   pooled = Pooling.apply(:mean, token_embeddings, attention_mask)
   #
   module Pooling
+    # Valid pooling strategies
+    VALID_STRATEGIES = %i[mean cls].freeze
+
+    # Check if a pooling strategy is valid
+    #
+    # @param strategy [Symbol] Pooling strategy to check
+    # @return [Boolean] True if valid
+    def self.valid?(strategy)
+      VALID_STRATEGIES.include?(strategy)
+    end
+
     class << self
       # Mean pooling - averages all token embeddings weighted by attention mask
       #
