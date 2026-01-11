@@ -127,19 +127,6 @@ Support for INT8/INT4 quantized models for faster inference and lower memory usa
 - Need to add quantized model variants to registry
 - Trade-off between speed and accuracy
 
-#### 8. Batched Parallel Processing
-Process multiple batches in parallel using threads.
-
-**API design:**
-```ruby
-embed.embed(documents, batch_size: 32, parallel: 4)
-```
-
-**Implementation notes:**
-- Ruby's GIL limits true parallelism
-- ONNX Runtime already uses threads internally
-- May provide marginal benefit for I/O-bound preprocessing
-
 ## CLI Enhancements
 
 Future CLI features to consider:
