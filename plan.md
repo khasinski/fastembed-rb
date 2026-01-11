@@ -65,25 +65,21 @@ See `Fastembed::TextCrossEncoder` class.
 
 ### Medium Priority
 
-#### 4. Image Embeddings
-Vision models for converting images to vectors. Useful for image search and multimodal applications.
+#### ~~4. Image Embeddings~~ ✅ IMPLEMENTED
 
-**Models to support:**
+Vision models for converting images to vectors. Requires `mini_magick` gem.
+
+**Supported models:**
 - `Qdrant/resnet50-onnx` (2048 dim)
 - `Qdrant/clip-ViT-B-32-vision` (512 dim)
 - `jinaai/jina-clip-v1` (768 dim)
 
-**API design:**
+**Usage:**
 ```ruby
+# Add to Gemfile: gem "mini_magick"
 image_embed = Fastembed::ImageEmbedding.new
 vector = image_embed.embed(["path/to/image.jpg"]).first
-# => [0.1, 0.2, ...]
 ```
-
-**Implementation notes:**
-- Requires image preprocessing (resize, normalize)
-- May need `mini_magick` or `vips` gem for image loading
-- CLIP models can embed both images and text into same space
 
 #### ~~5. Custom Model Support~~ ✅ IMPLEMENTED
 

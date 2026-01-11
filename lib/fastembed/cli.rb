@@ -31,6 +31,8 @@ module Fastembed
         list_rerankers
       when 'list-sparse'
         list_sparse
+      when 'list-image'
+        list_image
       when 'embed'
         embed
       when 'sparse-embed'
@@ -95,6 +97,7 @@ module Fastembed
           list-models     List available dense embedding models
           list-sparse     List available sparse embedding models
           list-rerankers  List available reranker models
+          list-image      List available image embedding models
           cache           Manage model cache (clear, info)
           version         Show version
           help            Show this help message
@@ -131,6 +134,18 @@ module Fastembed
       Fastembed::SUPPORTED_SPARSE_MODELS.each_value do |model|
         puts "  #{model.model_name}"
         puts "    Size: #{model.size_in_gb} GB"
+        puts "    Description: #{model.description}"
+        puts
+      end
+    end
+
+    def list_image
+      puts 'Available image embedding models:'
+      puts
+      Fastembed::SUPPORTED_IMAGE_MODELS.each_value do |model|
+        puts "  #{model.model_name}"
+        puts "    Dimensions: #{model.dim}"
+        puts "    Image Size: #{model.image_size}x#{model.image_size}"
         puts "    Description: #{model.description}"
         puts
       end
@@ -528,8 +543,8 @@ module Fastembed
       OptionParser.new do |opts|
         opts.banner = 'Usage: fastembed download [options] <model-name>'
 
-        opts.on('-t', '--type TYPE', %w[embedding reranker sparse late-interaction],
-                'Model type (embedding, reranker, sparse, late-interaction)') do |t|
+        opts.on('-t', '--type TYPE', %w[embedding reranker sparse late-interaction image],
+                'Model type (embedding, reranker, sparse, late-interaction, image)') do |t|
           @options[:download_type] = t.tr('-', '_').to_sym
         end
 
@@ -553,6 +568,8 @@ module Fastembed
                    SUPPORTED_SPARSE_MODELS.merge(CustomModelRegistry.sparse_models)
                  when :late_interaction
                    SUPPORTED_LATE_INTERACTION_MODELS.merge(CustomModelRegistry.late_interaction_models)
+                 when :image
+                   SUPPORTED_IMAGE_MODELS
                  else
                    SUPPORTED_MODELS.merge(CustomModelRegistry.embedding_models)
                  end
@@ -603,7 +620,8 @@ module Fastembed
         SUPPORTED_SPARSE_MODELS[model_name] ||
         CustomModelRegistry.sparse_models[model_name] ||
         SUPPORTED_LATE_INTERACTION_MODELS[model_name] ||
-        CustomModelRegistry.late_interaction_models[model_name]
+        CustomModelRegistry.late_interaction_models[model_name] ||
+        SUPPORTED_IMAGE_MODELS[model_name]
     end
 
     def display_model_info(model_name, info)
@@ -615,9 +633,10 @@ module Fastembed
       puts "  Tokenizer: #{info.tokenizer_file}"
 
       # Type-specific info
-      puts "  Dimensions: #{info.dim}" if info.respond_to?(:dim)
+      puts "  Dimensions: #{info.dim}" if info.respond_to?(:dim) && info.dim
       puts "  Pooling: #{info.pooling}" if info.respond_to?(:pooling)
       puts "  Normalize: #{info.normalize}" if info.respond_to?(:normalize)
+      puts "  Image Size: #{info.image_size}x#{info.image_size}" if info.respond_to?(:image_size)
 
       # Source info
       puts "  HuggingFace: https://huggingface.co/#{info.sources[:hf]}" if info.sources[:hf]
