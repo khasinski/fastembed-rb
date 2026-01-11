@@ -1,6 +1,6 @@
 # Benchmarks
 
-Performance benchmarks on Apple M1 Max, Ruby 3.3.10.
+Performance benchmarks on Apple M1 Max, Ruby 3.3, Python 3.13 (January 2026).
 
 ## Single Document Latency
 
@@ -71,36 +71,73 @@ We tested CoreML execution provider to see if GPU/Neural Engine acceleration hel
 
 ## Ruby vs Python FastEmbed
 
-We compared fastembed-rb against the original Python FastEmbed (v0.7.4) on Apple M1 Max.
+Comprehensive comparison of fastembed-rb against Python FastEmbed (v0.7.4) on Apple M1 Max.
 
-### Performance Comparison
+### Text Embeddings (100 documents)
 
-| Metric | Ruby | Python | Winner |
-|--------|------|--------|--------|
-| Model load time | **52-95ms** | 150ms | Ruby 1.6-2.9x |
-| Single doc latency | **2.3ms** | 4.5ms | Ruby 2x |
-| Throughput (100 docs) | 288/sec | 243/sec | Ruby 1.2x |
-| Throughput (500 docs) | 287/sec | 260/sec | Ruby 1.1x |
-| Throughput (1000 docs) | 288/sec | **317/sec** | Python 1.1x |
+| Model | Ruby (docs/sec) | Python (docs/sec) | Ratio |
+|-------|-----------------|-------------------|-------|
+| BAAI/bge-small-en-v1.5 | 566 | 629 | 0.90x |
+| BAAI/bge-base-en-v1.5 | 176 | 169 | **1.04x** |
+| all-MiniLM-L6-v2 | 922 | 1309 | 0.70x |
 
-### Why is Ruby Competitive?
+Ruby is within 10-30% of Python for text embeddings. Both use the same ONNX Runtime backend.
 
-Both implementations use the same underlying technology:
+### Rerankers (100 query-document pairs)
 
-1. **Same ONNX Runtime** - Both use ONNX Runtime for model inference. The actual neural network computation is identical C++ code.
+| Model | Ruby (pairs/sec) | Python (pairs/sec) | Ratio |
+|-------|------------------|-------------------|-------|
+| ms-marco-MiniLM-L-6-v2 | 986 | 982 | **1.00x** |
+| ms-marco-MiniLM-L-12-v2 | 398 | 512 | 0.78x |
+| BAAI/bge-reranker-base | 132 | 124 | **1.06x** |
 
-2. **Same tokenizer** - Both use HuggingFace Tokenizers (Rust-based). Ruby uses `tokenizers-ruby`, Python uses `tokenizers` - same Rust core.
+Ruby matches or beats Python on rerankers.
 
-3. **Minimal language overhead** - The hot path (tokenization + inference) happens in native code. Ruby/Python are just orchestrating.
+### Sparse Embeddings - SPLADE (100 documents)
 
-Ruby's advantages:
-- **Simpler architecture** - fastembed-rb is ~500 lines of Ruby. Python FastEmbed has more abstraction layers.
-- **Less overhead** - Ruby's C extensions have efficient FFI. Python's numpy array conversions add overhead.
-- **Faster model loading** - Ruby's ONNX binding initializes faster.
+| Model | Ruby (docs/sec) | Python (docs/sec) | Ratio |
+|-------|-----------------|-------------------|-------|
+| Splade_PP_en_v1 | 23 | 108 | 0.21x |
 
-Python's advantages:
-- **Better batching at scale** - Python's numpy enables more efficient large batch operations.
-- **More mature optimization** - Years of tuning for ML workloads.
+Ruby's SPLADE implementation is slower due to post-processing overhead. Python uses optimized numpy operations for the log1p transformation.
+
+### Late Interaction - ColBERT (100 documents)
+
+| Model | Ruby (docs/sec) | Python (docs/sec) | Ratio |
+|-------|-----------------|-------------------|-------|
+| colbert-ir/colbertv2.0 | 191 | 184 | **1.04x** |
+
+Ruby slightly outperforms Python for ColBERT embeddings.
+
+### Image Embeddings (100 images)
+
+| Model | Ruby (imgs/sec) | Python (imgs/sec) | Ratio |
+|-------|-----------------|-------------------|-------|
+| clip-ViT-B-32-vision | 9 | 42 | 0.22x |
+
+Ruby's image embedding is slower due to MiniMagick subprocess overhead for image preprocessing. Python uses Pillow which is more efficient for batch processing.
+
+### Summary
+
+| Category | Ruby vs Python |
+|----------|---------------|
+| Text Embeddings | ~90% of Python speed |
+| Rerankers | **Equal or faster** |
+| ColBERT | **Equal or faster** |
+| Sparse (SPLADE) | ~21% of Python speed |
+| Image | ~22% of Python speed |
+
+**Recommendation:** Ruby is excellent for text embeddings, reranking, and ColBERT. For heavy sparse or image embedding workloads, consider Python.
+
+### Why the Differences?
+
+Both implementations use the same ONNX Runtime for model inference. The differences come from:
+
+1. **Text/Reranker/ColBERT** - Hot path is tokenization (Rust) + inference (C++). Minimal language overhead. Ruby matches Python.
+
+2. **Sparse (SPLADE)** - Requires post-processing with log1p transformation. Python's numpy vectorization is faster than Ruby loops.
+
+3. **Image** - Requires image preprocessing (resize, normalize). Python's Pillow is faster than Ruby's MiniMagick (subprocess-based).
 
 ### Memory Usage
 
@@ -115,7 +152,7 @@ Memory is stable across multiple embedding rounds - no leaks detected.
 
 ### Embedding Quality
 
-Both implementations produce identical embeddings (same ONNX model), verified by cosine similarity tests:
+Both implementations produce identical embeddings (same ONNX models), verified by cosine similarity tests:
 
 ```
 'dog' vs 'puppy' = 0.855 (high - PASS)
@@ -139,13 +176,13 @@ puts "#{1000 / result.real} docs/sec"
 
 ## Reranker Performance
 
-TextCrossEncoder (cross-encoder) performance using ms-marco-MiniLM-L-6-v2:
+TextCrossEncoder (cross-encoder) performance:
 
-| Documents | Throughput | Latency |
-|-----------|------------|---------|
-| 10 docs | ~450 docs/sec | ~22ms |
-| 50 docs | ~380 docs/sec | ~130ms |
-| 100 docs | ~350 docs/sec | ~285ms |
+| Model | 100 pairs | Throughput |
+|-------|-----------|------------|
+| ms-marco-MiniLM-L-6-v2 | 102ms | **986 pairs/sec** |
+| ms-marco-MiniLM-L-12-v2 | 252ms | **398 pairs/sec** |
+| bge-reranker-base | 758ms | **132 pairs/sec** |
 
 Cross-encoders are slower than embedding models because they process query-document pairs together rather than encoding them independently.
 
