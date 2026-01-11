@@ -255,7 +255,7 @@ score = query.max_sim(doc)
 | Model | Dimensions | Notes |
 |-------|-----------|-------|
 | `colbert-ir/colbertv2.0` | 128 | Default |
-| `jinaai/jina-colbert-v1-en` | 128 | 8192 token context |
+| `jinaai/jina-colbert-v1-en` | 768 | 8192 token context |
 
 ## Image Embeddings
 

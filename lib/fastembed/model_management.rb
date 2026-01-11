@@ -132,6 +132,11 @@ module Fastembed
         # Download model file
         download_file(repo_id, model_info.model_file, model_dir, show_progress: show_progress)
 
+        # Some large models store weights in a separate .onnx_data file
+        # Try to download it if it exists (not required)
+        data_file = "#{model_info.model_file}_data"
+        download_file(repo_id, data_file, model_dir, show_progress: show_progress, required: false)
+
         # Download tokenizer and config files
         files_to_download = REQUIRED_FILES + [model_info.tokenizer_file]
         files_to_download.uniq.each do |file|
@@ -177,23 +182,29 @@ module Fastembed
           raise DownloadError, "Invalid URL scheme: #{url}"
         end
 
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', read_timeout: 300,
+        # Use longer timeout for large files
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', read_timeout: 600,
                                             open_timeout: 30) do |http|
           request = Net::HTTP::Get.new(uri)
           request['User-Agent'] = "fastembed-ruby/#{VERSION}"
 
-          response = http.request(request)
-
-          case response
-          when Net::HTTPSuccess
-            File.binwrite(local_path, response.body)
-          when Net::HTTPRedirection
-            new_url = response['location']
-            # Handle relative redirects
-            new_url = "#{uri.scheme}://#{uri.host}#{new_url}" if new_url.start_with?('/')
-            download_with_redirect(new_url, local_path, show_progress: show_progress, max_redirects: max_redirects - 1)
-          else
-            raise DownloadError, "HTTP #{response.code}: #{response.message}"
+          http.request(request) do |response|
+            case response
+            when Net::HTTPSuccess
+              # Stream to file to handle large files without loading into memory
+              File.open(local_path, 'wb') do |file|
+                response.read_body do |chunk|
+                  file.write(chunk)
+                end
+              end
+            when Net::HTTPRedirection
+              new_url = response['location']
+              # Handle relative redirects
+              new_url = "#{uri.scheme}://#{uri.host}#{new_url}" if new_url.start_with?('/')
+              download_with_redirect(new_url, local_path, show_progress: show_progress, max_redirects: max_redirects - 1)
+            else
+              raise DownloadError, "HTTP #{response.code}: #{response.message}"
+            end
           end
         end
       end

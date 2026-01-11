@@ -78,10 +78,11 @@ module Fastembed
     ),
     'jinaai/jina-colbert-v1-en' => LateInteractionModelInfo.new(
       model_name: 'jinaai/jina-colbert-v1-en',
-      dim: 128,
+      dim: 768,
       description: 'Jina ColBERT v1 for English with 8192 context',
-      size_in_gb: 0.55,
-      sources: { hf: 'jinaai/jina-colbert-v1-en' },
+      size_in_gb: 0.43,
+      sources: { hf: 'onnx-models/jina-colbert-v1-en-onnx' },
+      model_file: 'model.onnx',
       max_length: 8192
     )
   }.freeze

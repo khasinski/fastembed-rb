@@ -185,7 +185,25 @@ module Fastembed
         token_type_ids << pad_sequence(encoding.type_ids, pad_len)
       end
 
-      { 'input_ids' => input_ids, 'attention_mask' => attention_mask, 'token_type_ids' => token_type_ids }
+      inputs = { 'input_ids' => input_ids }
+
+      # Only add attention_mask if the model expects it
+      mask_key = if session_input_names.include?('attention_mask')
+                   'attention_mask'
+                 elsif session_input_names.include?('input_mask')
+                   'input_mask'
+                 end
+      inputs[mask_key] = attention_mask if mask_key
+
+      # Only add token_type_ids if the model expects it
+      type_key = if session_input_names.include?('token_type_ids')
+                   'token_type_ids'
+                 elsif session_input_names.include?('segment_ids')
+                   'segment_ids'
+                 end
+      inputs[type_key] = token_type_ids if type_key
+
+      inputs
     end
 
     def pad_sequence(sequence, pad_len)
