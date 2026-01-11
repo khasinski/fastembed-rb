@@ -156,8 +156,8 @@ RSpec.describe Fastembed::Async do
   end
 end
 
-RSpec.describe 'TextEmbedding async methods' do
-  let(:embedding) { Fastembed::TextEmbedding.new }
+RSpec.describe 'TextEmbedding async methods', :integration do
+  let(:embedding) { Fastembed::TextEmbedding.new(show_progress: false) }
 
   describe '#embed_async' do
     it 'returns a Future' do

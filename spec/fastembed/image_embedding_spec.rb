@@ -110,39 +110,37 @@ RSpec.describe Fastembed::ImageEmbedding do
     end
   end
 
-  # Integration tests - only run if mini_magick is available
+  # Integration tests - only run if mini_magick and ImageMagick are available
   describe 'integration', :integration do
     before(:all) do
+      @mini_magick_available = false
+      @test_image_path = nil
       begin
         require 'mini_magick'
+        # Test if ImageMagick is actually installed and working
+        path = File.join(Dir.tmpdir, "fastembed_test_#{Process.pid}.png")
+        MiniMagick::Tool::Magick.new do |magick|
+          magick.size '224x224'
+          magick << 'xc:white'
+          magick << path
+        end
+        @test_image_path = path
         @mini_magick_available = true
-      rescue LoadError
+      rescue LoadError, StandardError
         @mini_magick_available = false
       end
+    end
+
+    after(:all) do
+      File.delete(@test_image_path) if @test_image_path && File.exist?(@test_image_path)
     end
 
     before do
       skip 'mini_magick not available' unless @mini_magick_available
     end
 
-    let(:embedding) { described_class.new }
-    let(:test_image_path) { create_test_image }
-
-    after do
-      File.delete(test_image_path) if test_image_path && File.exist?(test_image_path)
-    end
-
-    def create_test_image
-      require 'tempfile'
-      # Create a simple test image using MiniMagick
-      path = Tempfile.new(['test', '.png']).path
-      MiniMagick::Tool::Convert.new do |convert|
-        convert.size '224x224'
-        convert.xc 'white'
-        convert << path
-      end
-      path
-    end
+    let(:embedding) { described_class.new(show_progress: false) }
+    let(:test_image_path) { @test_image_path }
 
     describe '#embed' do
       it 'generates embeddings for a single image' do
