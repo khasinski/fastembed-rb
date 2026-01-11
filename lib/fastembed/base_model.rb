@@ -153,14 +153,29 @@ module Fastembed
       input_ids = encodings.map(&:ids)
       attention_mask = encodings.map(&:attention_mask)
 
-      inputs = {
-        'input_ids' => input_ids,
-        'attention_mask' => attention_mask
-      }
+      inputs = { 'input_ids' => input_ids }
 
-      if session_input_names.include?('token_type_ids')
+      # Add attention_mask/input_mask if the model expects it
+      # (SPLADE models use input_mask, most BERT models use attention_mask)
+      mask_key = if session_input_names.include?('attention_mask')
+                   'attention_mask'
+                 elsif session_input_names.include?('input_mask')
+                   'input_mask'
+                 end
+
+      inputs[mask_key] = attention_mask if mask_key
+
+      # Add token_type_ids/segment_ids if the model expects it
+      # (SPLADE models use segment_ids, BERT models use token_type_ids)
+      token_type_key = if session_input_names.include?('token_type_ids')
+                         'token_type_ids'
+                       elsif session_input_names.include?('segment_ids')
+                         'segment_ids'
+                       end
+
+      if token_type_key
         token_type_ids = encodings.map { |e| e.type_ids || Array.new(e.ids.length, 0) }
-        inputs['token_type_ids'] = token_type_ids
+        inputs[token_type_key] = token_type_ids
       end
 
       inputs

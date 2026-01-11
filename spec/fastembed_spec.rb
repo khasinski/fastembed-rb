@@ -215,5 +215,50 @@ RSpec.describe Fastembed::TextEmbedding do
         described_class.new(local_model_dir: '/nonexistent/path')
       end.to raise_error(ArgumentError, /Local model directory not found/)
     end
+
+    context 'with custom model registration' do
+      after do
+        Fastembed::CustomModelRegistry.clear_all
+      end
+
+      it 'can register and use custom model' do
+        # Register a custom model (same as bge-small for testing)
+        Fastembed.register_model(
+          model_name: 'my-custom/model',
+          dim: 384,
+          sources: { hf: 'Xenova/bge-small-en-v1.5' }
+        )
+
+        models = described_class.list_supported_models
+        custom = models.find { |m| m[:model_name] == 'my-custom/model' }
+        expect(custom).not_to be_nil
+      end
+    end
+  end
+end
+
+RSpec.describe 'Local model loading across model types' do
+  describe Fastembed::TextSparseEmbedding do
+    it 'raises error if local directory does not exist' do
+      expect do
+        described_class.new(local_model_dir: '/nonexistent/path')
+      end.to raise_error(ArgumentError, /Local model directory not found/)
+    end
+  end
+
+  describe Fastembed::LateInteractionTextEmbedding do
+    it 'raises error if local directory does not exist' do
+      expect do
+        described_class.new(local_model_dir: '/nonexistent/path')
+      end.to raise_error(ArgumentError, /Local model directory not found/)
+    end
+  end
+
+  describe Fastembed::TextCrossEncoder do
+    it 'raises error if local directory does not exist' do
+      expect do
+        described_class.new(local_model_dir: '/nonexistent/path')
+      end.to raise_error(ArgumentError, /Local model directory not found/)
+    end
   end
 end

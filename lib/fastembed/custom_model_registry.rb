@@ -100,16 +100,14 @@ module Fastembed
       # @param size_in_gb [Float] Approximate model size
       # @param model_file [String] Path to ONNX file
       # @param tokenizer_file [String] Path to tokenizer.json
-      # @param max_length [Integer] Maximum sequence length
       # @return [RerankerModelInfo] The registered model info
       def register_reranker_model(
         model_name:,
         description: 'Custom reranker',
         sources: {},
         size_in_gb: 0,
-        model_file: 'model.onnx',
-        tokenizer_file: 'tokenizer.json',
-        max_length: 512
+        model_file: 'onnx/model.onnx',
+        tokenizer_file: 'tokenizer.json'
       )
         reranker_models[model_name] = RerankerModelInfo.new(
           model_name: model_name,
@@ -117,8 +115,7 @@ module Fastembed
           sources: sources,
           size_in_gb: size_in_gb,
           model_file: model_file,
-          tokenizer_file: tokenizer_file,
-          max_length: max_length
+          tokenizer_file: tokenizer_file
         )
       end
 
@@ -137,7 +134,7 @@ module Fastembed
         description: 'Custom sparse model',
         sources: {},
         size_in_gb: 0,
-        model_file: 'model.onnx',
+        model_file: 'onnx/model.onnx',
         tokenizer_file: 'tokenizer.json',
         max_length: 512
       )
@@ -169,7 +166,7 @@ module Fastembed
         description: 'Custom late interaction model',
         sources: {},
         size_in_gb: 0,
-        model_file: 'model.onnx',
+        model_file: 'onnx/model.onnx',
         tokenizer_file: 'tokenizer.json',
         max_length: 512
       )

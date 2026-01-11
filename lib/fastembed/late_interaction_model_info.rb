@@ -73,6 +73,7 @@ module Fastembed
       description: 'ColBERTv2 for late interaction retrieval',
       size_in_gb: 0.44,
       sources: { hf: 'colbert-ir/colbertv2.0' },
+      model_file: 'model.onnx',
       max_length: 512
     ),
     'jinaai/jina-colbert-v1-en' => LateInteractionModelInfo.new(

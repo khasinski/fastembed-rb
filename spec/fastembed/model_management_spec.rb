@@ -3,7 +3,6 @@
 require 'spec_helper'
 require 'tmpdir'
 require 'fileutils'
-require 'webmock/rspec'
 
 RSpec.describe Fastembed::ModelManagement do
   let(:tmp_cache_dir) { Dir.mktmpdir('fastembed-test') }

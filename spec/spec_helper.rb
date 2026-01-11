@@ -2,6 +2,7 @@
 
 require 'bundler/setup'
 require 'fastembed'
+require 'webmock/rspec'
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -12,5 +13,22 @@ RSpec.configure do |config|
 
   config.expect_with :rspec do |c|
     c.syntax = :expect
+  end
+
+  # Allow real HTTP connections for integration tests
+  config.before(:all, :integration) do
+    WebMock.allow_net_connect!
+  end
+
+  config.after(:all, :integration) do
+    WebMock.disable_net_connect!
+  end
+
+  config.before(:each, :integration) do
+    WebMock.allow_net_connect!
+  end
+
+  config.after(:each, :integration) do
+    WebMock.disable_net_connect!
   end
 end

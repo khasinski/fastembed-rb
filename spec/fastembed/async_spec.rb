@@ -214,3 +214,225 @@ RSpec.describe 'TextEmbedding async methods' do
     end
   end
 end
+
+RSpec.describe 'SparseEmbedding async methods', :integration do
+  before(:all) do
+    begin
+      @embedding = Fastembed::TextSparseEmbedding.new(show_progress: false)
+      @sparse_available = true
+    rescue StandardError => e
+      @sparse_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @sparse_available
+  end
+
+  let(:embedding) { @embedding }
+
+  describe '#embed_async' do
+    it 'returns a Future' do
+      future = embedding.embed_async(['hello'])
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces sparse embeddings' do
+      future = embedding.embed_async(['hello', 'world'])
+      vectors = future.value
+
+      expect(vectors.length).to eq(2)
+      expect(vectors[0]).to be_a(Fastembed::SparseEmbedding)
+      expect(vectors[0].indices).to be_an(Array)
+      expect(vectors[0].values).to be_an(Array)
+    end
+  end
+
+  describe '#query_embed_async' do
+    it 'returns a Future' do
+      future = embedding.query_embed_async('what is ruby?')
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces sparse embeddings' do
+      future = embedding.query_embed_async(['query1', 'query2'])
+      vectors = future.value
+      expect(vectors.length).to eq(2)
+      expect(vectors[0]).to be_a(Fastembed::SparseEmbedding)
+    end
+  end
+
+  describe '#passage_embed_async' do
+    it 'returns a Future' do
+      future = embedding.passage_embed_async('ruby is a programming language')
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces sparse embeddings' do
+      future = embedding.passage_embed_async(['passage1', 'passage2'])
+      vectors = future.value
+      expect(vectors.length).to eq(2)
+      expect(vectors[0]).to be_a(Fastembed::SparseEmbedding)
+    end
+  end
+end
+
+RSpec.describe 'LateInteractionEmbedding async methods', :integration do
+  before(:all) do
+    begin
+      @embedding = Fastembed::LateInteractionTextEmbedding.new(show_progress: false)
+      @late_interaction_available = true
+    rescue StandardError => e
+      @late_interaction_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @late_interaction_available
+  end
+
+  let(:embedding) { @embedding }
+
+  describe '#embed_async' do
+    it 'returns a Future' do
+      future = embedding.embed_async(['hello'])
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces token embeddings' do
+      future = embedding.embed_async(['hello', 'world'])
+      vectors = future.value
+
+      expect(vectors.length).to eq(2)
+      # Each document has a LateInteractionEmbedding with multiple token embeddings
+      expect(vectors[0]).to be_a(Fastembed::LateInteractionEmbedding)
+      expect(vectors[0].to_a.first.length).to eq(embedding.dim)
+    end
+  end
+
+  describe '#query_embed_async' do
+    it 'returns a Future' do
+      future = embedding.query_embed_async('what is ruby?')
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces token embeddings' do
+      future = embedding.query_embed_async(['query1', 'query2'])
+      vectors = future.value
+      expect(vectors.length).to eq(2)
+      expect(vectors[0]).to be_a(Fastembed::LateInteractionEmbedding)
+    end
+  end
+
+  describe '#passage_embed_async' do
+    it 'returns a Future' do
+      future = embedding.passage_embed_async('ruby is a programming language')
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces token embeddings' do
+      future = embedding.passage_embed_async(['passage1', 'passage2'])
+      vectors = future.value
+      expect(vectors.length).to eq(2)
+      expect(vectors[0]).to be_a(Fastembed::LateInteractionEmbedding)
+    end
+  end
+end
+
+RSpec.describe 'TextCrossEncoder async methods', :integration do
+  before(:all) do
+    begin
+      @encoder = Fastembed::TextCrossEncoder.new(show_progress: false)
+      @reranker_available = true
+    rescue StandardError => e
+      @reranker_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @reranker_available
+  end
+
+  let(:encoder) { @encoder }
+
+  describe '#rerank_async' do
+    it 'returns a Future' do
+      future = encoder.rerank_async(query: 'test', documents: %w[doc1 doc2])
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces scores' do
+      future = encoder.rerank_async(query: 'Ruby', documents: ['Ruby code', 'Python code'])
+      scores = future.value
+
+      expect(scores.length).to eq(2)
+      expect(scores[0]).to be_a(Float)
+    end
+  end
+
+  describe '#rerank_with_scores_async' do
+    it 'returns a Future' do
+      future = encoder.rerank_with_scores_async(query: 'test', documents: %w[doc1 doc2])
+      expect(future).to be_a(Fastembed::Async::Future)
+    end
+
+    it 'produces sorted results with scores' do
+      future = encoder.rerank_with_scores_async(
+        query: 'Ruby programming',
+        documents: ['Ruby code', 'Python code', 'JavaScript code']
+      )
+      results = future.value
+
+      expect(results.length).to eq(3)
+      expect(results[0]).to have_key(:document)
+      expect(results[0]).to have_key(:score)
+      expect(results[0]).to have_key(:index)
+      # Results should be sorted by score (highest first)
+      scores = results.map { |r| r[:score] }
+      expect(scores).to eq(scores.sort.reverse)
+    end
+
+    it 'respects top_k parameter' do
+      future = encoder.rerank_with_scores_async(
+        query: 'test',
+        documents: %w[a b c d e],
+        top_k: 2
+      )
+      results = future.value
+
+      expect(results.length).to eq(2)
+    end
+  end
+end
+
+RSpec.describe 'Concurrent async operations across model types', :integration do
+  before(:all) do
+    begin
+      @text_embedding = Fastembed::TextEmbedding.new(show_progress: false)
+      @text_available = true
+    rescue StandardError => e
+      @text_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @text_available
+  end
+
+  it 'supports running multiple text embedding futures concurrently' do
+    futures = [
+      @text_embedding.embed_async(['hello world']),
+      @text_embedding.embed_async(['another document'])
+    ]
+
+    results = futures.map(&:value)
+
+    expect(results[0].first).to be_an(Array)
+    expect(results[0].first.length).to eq(@text_embedding.dim)
+    expect(results[1].first.length).to eq(@text_embedding.dim)
+  end
+end

@@ -4,6 +4,8 @@ require 'spec_helper'
 require 'fastembed/cli'
 require 'json'
 require 'open3'
+require 'tmpdir'
+require 'tempfile'
 
 RSpec.describe Fastembed::CLI do
   let(:exe_path) { File.expand_path('../../exe/fastembed', __dir__) }
@@ -284,6 +286,205 @@ RSpec.describe Fastembed::CLI do
     it 'shows error for unknown command' do
       cli = described_class.new(['unknown'])
       expect { cli.run }.to output(/Unknown command/).to_stderr.and raise_error(SystemExit)
+    end
+  end
+
+  describe 'list-image command' do
+    it 'lists all supported image models' do
+      cli = described_class.new(['list-image'])
+      expect { cli.run }.to output(%r{Qdrant/clip-ViT-B-32-vision}).to_stdout
+    end
+
+    it 'shows model dimensions' do
+      cli = described_class.new(['list-image'])
+      expect { cli.run }.to output(/Dimensions: 512/).to_stdout
+    end
+
+    it 'shows image size' do
+      cli = described_class.new(['list-image'])
+      expect { cli.run }.to output(/Image Size: 224x224/).to_stdout
+    end
+  end
+
+  describe 'download command' do
+    it 'shows error when no model name provided' do
+      cli = described_class.new(['download'])
+      expect { cli.run }.to output(/Model name required/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'shows error for unknown model' do
+      cli = described_class.new(['download', 'unknown/model'])
+      expect { cli.run }.to output(/Unknown.*model/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'shows help with --help' do
+      cli = described_class.new(['download', '--help'])
+      expect { cli.run }.to output(/Usage: fastembed download/).to_stdout.and raise_error(SystemExit)
+    end
+
+    it 'accepts --type option' do
+      cli = described_class.new(['download', '--type', 'reranker', 'unknown/model'])
+      expect { cli.run }.to output(/Unknown reranker model/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'accepts image type' do
+      cli = described_class.new(['download', '--type', 'image', 'unknown/model'])
+      expect { cli.run }.to output(/Unknown image model/).to_stderr.and raise_error(SystemExit)
+    end
+  end
+
+  describe 'info command' do
+    it 'shows error when no model name provided' do
+      cli = described_class.new(['info'])
+      expect { cli.run }.to output(/Model name required/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'shows error for unknown model' do
+      cli = described_class.new(['info', 'unknown/model'])
+      expect { cli.run }.to output(/Unknown model/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it 'shows info for embedding model' do
+      cli = described_class.new(['info', 'BAAI/bge-small-en-v1.5'])
+      output = capture_stdout { cli.run }
+
+      expect(output).to include('Model: BAAI/bge-small-en-v1.5')
+      expect(output).to include('Dimensions: 384')
+      expect(output).to include('Description:')
+      expect(output).to include('HuggingFace:')
+    end
+
+    it 'shows info for reranker model' do
+      cli = described_class.new(['info', 'cross-encoder/ms-marco-MiniLM-L-6-v2'])
+      output = capture_stdout { cli.run }
+
+      expect(output).to include('Model: cross-encoder/ms-marco-MiniLM-L-6-v2')
+      expect(output).to include('Description:')
+    end
+
+    it 'shows info for sparse model' do
+      cli = described_class.new(['info', 'prithivida/Splade_PP_en_v1'])
+      output = capture_stdout { cli.run }
+
+      expect(output).to include('Model: prithivida/Splade_PP_en_v1')
+    end
+
+    it 'shows info for image model' do
+      cli = described_class.new(['info', 'Qdrant/clip-ViT-B-32-vision'])
+      output = capture_stdout { cli.run }
+
+      expect(output).to include('Model: Qdrant/clip-ViT-B-32-vision')
+      expect(output).to include('Image Size: 224x224')
+    end
+
+    it 'shows cache status' do
+      cli = described_class.new(['info', 'BAAI/bge-small-en-v1.5'])
+      output = capture_stdout { cli.run }
+
+      expect(output).to match(/Cached: (Yes|No)/)
+    end
+
+    it 'shows help with --help' do
+      cli = described_class.new(['info', '--help'])
+      expect { cli.run }.to output(/Usage: fastembed info/).to_stdout.and raise_error(SystemExit)
+    end
+  end
+
+  describe 'benchmark command' do
+    it 'shows help with --help' do
+      cli = described_class.new(['benchmark', '--help'])
+      expect { cli.run }.to output(/Usage: fastembed benchmark/).to_stdout.and raise_error(SystemExit)
+    end
+
+    # Full benchmark tests are slow, so we just test option parsing
+    it 'accepts model option' do
+      cli = described_class.new(['benchmark', '-m', 'BAAI/bge-small-en-v1.5', '-n', '1'])
+      # This will actually run the benchmark with 1 iteration
+      output = capture_stdout { cli.run }
+      expect(output).to include('Benchmarking BAAI/bge-small-en-v1.5')
+    end
+  end
+
+  describe 'embed command with file input' do
+    let(:tmp_file) { Tempfile.new(['test_input', '.txt']) }
+
+    after do
+      tmp_file.close
+      tmp_file.unlink
+    end
+
+    it 'reads texts from file with -i option' do
+      tmp_file.write("hello\nworld\n")
+      tmp_file.flush
+
+      cli = described_class.new(['embed', '-i', tmp_file.path])
+      output = capture_stdout { cli.run }
+      result = JSON.parse(output)
+
+      expect(result.length).to eq(2)
+      expect(result[0]['text']).to eq('hello')
+      expect(result[1]['text']).to eq('world')
+    end
+
+    it 'skips empty lines in input file' do
+      tmp_file.write("hello\n\nworld\n\n")
+      tmp_file.flush
+
+      cli = described_class.new(['embed', '-i', tmp_file.path])
+      output = capture_stdout { cli.run }
+      result = JSON.parse(output)
+
+      expect(result.length).to eq(2)
+    end
+
+    it 'shows error for nonexistent file' do
+      cli = described_class.new(['embed', '-i', '/nonexistent/file.txt'])
+      expect { cli.run }.to output(/File not found/).to_stderr.and raise_error(SystemExit)
+    end
+  end
+
+  describe 'embed command with quiet mode' do
+    it 'suppresses model download progress with -q' do
+      # Note: This is hard to test without actually downloading
+      # We mainly verify the option is accepted
+      cli = described_class.new(['embed', '-q', 'hello'])
+      output = capture_stdout { cli.run }
+
+      # Should still produce output
+      expect(output).not_to be_empty
+    end
+  end
+
+  describe 'embed command with progress bar' do
+    it 'accepts -p option' do
+      cli = described_class.new(['embed', '-p', 'hello', 'world'])
+      # The progress output goes to stderr, embedding to stdout
+      output = capture_stdout { cli.run }
+      result = JSON.parse(output)
+
+      expect(result.length).to eq(2)
+    end
+  end
+
+  describe 'global help includes new commands' do
+    it 'shows download command' do
+      cli = described_class.new(['help'])
+      expect { cli.run }.to output(/download.*Pre-download/).to_stdout
+    end
+
+    it 'shows info command' do
+      cli = described_class.new(['help'])
+      expect { cli.run }.to output(/info.*detailed information/).to_stdout
+    end
+
+    it 'shows benchmark command' do
+      cli = described_class.new(['help'])
+      expect { cli.run }.to output(/benchmark.*performance/).to_stdout
+    end
+
+    it 'shows list-image command' do
+      cli = described_class.new(['help'])
+      expect { cli.run }.to output(/list-image/).to_stdout
     end
   end
 

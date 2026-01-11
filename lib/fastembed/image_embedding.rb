@@ -238,12 +238,12 @@ module Fastembed
     end
 
     def extract_pixels(image)
-      # Get raw RGB pixel data
-      image.format 'rgb'
-      blob = image.to_blob
+      # Get raw RGB pixel data using ImageMagick's export
+      # depth:8 ensures 8-bit per channel, and 'RGB' gives us raw RGB bytes
+      pixels_str = image.run_command('convert', image.path, '-depth', '8', 'RGB:-')
 
       # Convert to array of RGB values [0-255]
-      blob.unpack('C*')
+      pixels_str.unpack('C*')
     end
 
     def normalize_pixels(pixels)

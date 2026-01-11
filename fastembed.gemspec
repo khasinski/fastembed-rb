@@ -32,6 +32,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'onnxruntime', '~> 0.9'
   spec.add_dependency 'tokenizers', '~> 0.5'
 
+  spec.add_development_dependency 'mini_magick', '~> 4.0'
   spec.add_development_dependency 'rake', '~> 13.0'
   spec.add_development_dependency 'rspec', '~> 3.0'
   spec.add_development_dependency 'rubocop', '~> 1.0'

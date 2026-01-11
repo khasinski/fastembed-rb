@@ -64,13 +64,15 @@ module Fastembed
       model_name: 'prithivida/Splade_PP_en_v1',
       description: 'SPLADE++ model for sparse text retrieval',
       size_in_gb: 0.53,
-      sources: { hf: 'Xenova/splade-pp-en-v1' }
+      sources: { hf: 'prithivida/Splade_PP_en_v1' }
+      # Uses default model_file: 'onnx/model.onnx'
     ),
-    'prithvida/Splade_PP_en_v2' => SparseModelInfo.new(
-      model_name: 'prithvida/Splade_PP_en_v2',
+    'prithivida/Splade_PP_en_v2' => SparseModelInfo.new(
+      model_name: 'prithivida/Splade_PP_en_v2',
       description: 'SPLADE++ v2 with improved performance',
       size_in_gb: 0.53,
-      sources: { hf: 'prithvida/Splade_PP_en_v2' }
+      sources: { hf: 'prithivida/Splade_PP_en_v2' }
+      # Uses default model_file: 'onnx/model.onnx'
     )
   }.freeze
 

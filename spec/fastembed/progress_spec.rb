@@ -97,3 +97,86 @@ RSpec.describe 'TextEmbedding with progress callback' do
     expect(result.length).to eq(2)
   end
 end
+
+RSpec.describe 'SparseEmbedding with progress callback', :integration do
+  before(:all) do
+    begin
+      @embedding = Fastembed::TextSparseEmbedding.new(show_progress: false)
+      @sparse_available = true
+    rescue StandardError => e
+      @sparse_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @sparse_available
+  end
+
+  let(:embedding) { @embedding }
+
+  it 'calls progress callback for each batch' do
+    documents = Array.new(50) { 'test document' }
+    progress_calls = []
+
+    embedding.embed(documents, batch_size: 16) do |progress|
+      progress_calls << progress
+    end.to_a
+
+    expect(progress_calls.length).to eq(4) # 50 docs / 16 batch = 4 batches (ceil)
+    expect(progress_calls.first.current).to eq(1)
+    expect(progress_calls.last.complete?).to be true
+  end
+
+  it 'provides accurate documents_processed count' do
+    documents = Array.new(50) { 'test document' }
+    last_progress = nil
+
+    embedding.embed(documents, batch_size: 16) do |progress|
+      last_progress = progress
+    end.to_a
+
+    expect(last_progress.documents_processed).to eq(64) # 4 batches * 16
+  end
+end
+
+RSpec.describe 'LateInteractionEmbedding with progress callback', :integration do
+  before(:all) do
+    begin
+      @embedding = Fastembed::LateInteractionTextEmbedding.new(show_progress: false)
+      @late_interaction_available = true
+    rescue StandardError => e
+      @late_interaction_available = false
+      @skip_reason = e.message
+    end
+  end
+
+  before do
+    skip @skip_reason unless @late_interaction_available
+  end
+
+  let(:embedding) { @embedding }
+
+  it 'calls progress callback for each batch' do
+    documents = Array.new(30) { 'test document' }
+    progress_calls = []
+
+    embedding.embed(documents, batch_size: 10) do |progress|
+      progress_calls << progress
+    end.to_a
+
+    expect(progress_calls.length).to eq(3) # 30 docs / 10 batch = 3 batches
+    expect(progress_calls.last.complete?).to be true
+  end
+
+  it 'reports correct percentage' do
+    documents = Array.new(20) { 'test document' }
+    percentages = []
+
+    embedding.embed(documents, batch_size: 10) do |progress|
+      percentages << progress.percentage
+    end.to_a
+
+    expect(percentages).to eq([0.5, 1.0])
+  end
+end
