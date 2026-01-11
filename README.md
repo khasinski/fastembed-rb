@@ -1,6 +1,6 @@
 # FastEmbed Ruby
 
-[![Gem Version](https://badge.fury.io/rb/fastembed.svg)](https://rubygems.org/gems/fastembed)
+[![Gem Version](https://img.shields.io/gem/v/fastembed.svg)](https://rubygems.org/gems/fastembed)
 [![CI](https://github.com/khasinski/fastembed-rb/actions/workflows/ci.yml/badge.svg)](https://github.com/khasinski/fastembed-rb/actions/workflows/ci.yml)
 
 Fast, lightweight text embeddings in Ruby. A port of [FastEmbed](https://github.com/qdrant/fastembed) by Qdrant.
